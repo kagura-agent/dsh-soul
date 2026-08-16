@@ -1,15 +1,14 @@
-// Host-half integration test: shim src/index.js (like dsh-migrate-openclaw's
-// suite), drive apply() with a mock ctx, and exercise the persona routes
-// against a fake $HOME so ~/.dsh/personas and ~/.dsh/AGENTS.md are scratch.
-import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, readdirSync } from "node:fs";
+// Host-half integration test for dsh-soul: drive apply() with a mock ctx and
+// exercise the routes against a fake $HOME (~/.dsh/souls, ~/.dsh/AGENTS.md).
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 
 const src = readFileSync(new URL("./src/index.js", import.meta.url), "utf8");
 const shim = src
-  .replace('import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, rmSync, copyFileSync } from "node:fs";', 'const { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, rmSync, copyFileSync } = await import("node:fs");')
-  .replace('import { join, dirname } from "node:path";', 'const { join, dirname } = await import("node:path");')
+  .replace('import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, rmSync, copyFileSync, utimesSync } from "node:fs";', 'const { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync, rmSync, copyFileSync, utimesSync } = await import("node:fs");')
+  .replace('import { join, dirname, extname } from "node:path";', 'const { join, dirname, extname } = await import("node:path");')
   .replace('import { homedir } from "node:os";', 'const { homedir } = await import("node:os");')
   .replace("export { name, inject, apply };", "export { name, inject, apply };");
 const mod = await import("data:text/javascript;base64," + Buffer.from(shim).toString("base64"));
@@ -21,7 +20,7 @@ const check = (cond, label) => {
   else { failures += 1; console.log(`FAIL  ${label}`); }
 };
 
-const root = join(tmpdir(), "dsh-persona-e2e-" + randomBytes(4).toString("hex"));
+const root = join(tmpdir(), "dsh-soul-e2e-" + randomBytes(4).toString("hex"));
 const fakeHome = join(root, "home");
 mkdirSync(fakeHome, { recursive: true });
 const savedHome = process.env.HOME;
@@ -29,10 +28,7 @@ process.env.HOME = fakeHome;
 
 const registered = [];
 const ctx = {
-  get(n) {
-    if (n === "webServer") return { register: (route) => { registered.push(route); return () => {}; } };
-    return void 0;
-  },
+  get(n) { if (n === "webServer") return { register: (r) => { registered.push(r); return () => {}; } }; return void 0; },
   effect(fn) { return fn(); },
 };
 apply(ctx, {});
@@ -41,19 +37,15 @@ function fakeReq(body) {
   const chunks = [Buffer.from(JSON.stringify(body))];
   let sent = false;
   return {
-    on(ev, cb) {
-      if (ev === "data" && !sent) { sent = true; for (const c of chunks) cb(c); }
-      if (ev === "end") cb();
-      return this;
-    },
+    on(ev, cb) { if (ev === "data" && !sent) { sent = true; for (const c of chunks) cb(c); } if (ev === "end") cb(); return this; },
     destroy() {},
   };
 }
 function fakeRes() {
-  const out = { status: 0, body: null };
+  const out = { status: 0, body: null, buffer: null };
   return {
     writeHead(s, h) { out.status = s; out.headers = h; },
-    end(p) { out.body = p; },
+    end(p) { if (typeof p === "string") out.body = p; else out.buffer = p; },
     out,
   };
 }
@@ -61,63 +53,83 @@ const byPath = (p) => registered.find((r) => r.path === p);
 const call = async (path, body) => {
   const res = fakeRes();
   await byPath(path).handler(fakeReq(body), res);
-  return { status: res.out.status, body: JSON.parse(res.out.body) };
+  return { status: res.out.status, body: res.out.body !== null ? JSON.parse(res.out.body) : null, buffer: res.out.buffer };
 };
 const agentsPath = join(fakeHome, ".dsh", "AGENTS.md");
 
 // --- 1. empty list -----------------------------------------------------------
 {
-  const r = await call("/api/dsh-persona/list", {});
-  check(r.status === 200 && r.body.ok && r.body.personas.length === 0, "list: empty to start");
-  check(r.body.active === null, "list: no active persona");
+  const r = await call("/api/dsh-soul/list", {});
+  check(r.status === 200 && r.body.souls.length === 0 && r.body.active === null, "list: empty to start");
 }
 
-// --- 2. create + list --------------------------------------------------------
+// --- 2. create ---------------------------------------------------------------
 {
-  const r = await call("/api/dsh-persona/new", { name: "kagura" });
-  check(r.status === 200 && r.body.ok && r.body.persona.files.length === 5, "new: skeleton with 5 files");
-  const dup = await call("/api/dsh-persona/new", { name: "kagura" });
-  check(dup.status === 400, "new: duplicate rejected");
-  const bad = await call("/api/dsh-persona/new", { name: "../evil" });
-  check(bad.status === 400, "new: traversal name rejected");
-  const r2 = await call("/api/dsh-persona/list", {});
-  check(r2.body.personas.length === 1 && r2.body.personas[0].name === "kagura" && !r2.body.personas[0].active, "list: one inactive persona");
+  const r = await call("/api/dsh-soul/new", { name: "kagura" });
+  check(r.status === 200 && r.body.soul.dna.length === 5, "new: skeleton with 5 DNA files");
+  check(r.body.soul.notes === 0 && r.body.soul.beliefsBytes > 0, "new: beliefs + memory dirs seeded");
+  check((await call("/api/dsh-soul/new", { name: "kagura" })).status === 400, "new: duplicate rejected");
+  check((await call("/api/dsh-soul/new", { name: "../evil" })).status === 400, "new: traversal rejected");
 }
 
 // --- 3. activate -------------------------------------------------------------
 {
-  const r = await call("/api/dsh-persona/activate", { name: "kagura" });
-  check(r.status === 200 && r.body.ok && r.body.active === "kagura", "activate: ok");
-  check(existsSync(agentsPath), "activate: ~/.dsh/AGENTS.md written");
+  const r = await call("/api/dsh-soul/activate", { name: "kagura" });
+  check(r.status === 200 && r.body.active === "kagura" && r.body.activations === 1, "activate: ok, activation #1");
   const text = readFileSync(agentsPath, "utf8");
-  check(text.includes("由 dsh-persona 生成") && text.includes("Active persona: kagura"), "activate: marker + persona name");
-  check(text.includes("# SOUL.md") && text.includes("# MEMORY.md"), "activate: persona files aggregated");
-  const r2 = await call("/api/dsh-persona/list", {});
-  check(r2.body.active === "kagura" && r2.body.personas[0].active === true, "list: kagura active");
-  // re-activate: target carries marker → overwrite without backup
-  const r3 = await call("/api/dsh-persona/activate", { name: "kagura" });
-  check(r3.status === 200 && r3.body.backedUp === false, "activate: re-run overwrites without backup");
+  check(text.includes("由 dsh-soul 生成") && text.includes("Active soul: kagura"), "activate: marker + soul name");
+  check(text.includes("# SOUL.md") && text.includes("# MEMORY.md"), "activate: DNA aggregated");
+  const r2 = await call("/api/dsh-soul/list", {});
+  check(r2.body.active === "kagura" && r2.body.souls[0].active === true, "list: kagura active");
+  const r3 = await call("/api/dsh-soul/activate", { name: "kagura" });
+  check(r3.body.activations === 2 && r3.body.backedUp === false, "activate: re-run overwrites without backup");
 }
 
-// --- 4. save one file --------------------------------------------------------
+// --- 4. lazy re-aggregation ---------------------------------------------------
 {
-  const r = await call("/api/dsh-persona/save", { name: "kagura", file: "SOUL.md", content: "# SOUL.md\n\nBe concise.\n" });
-  check(r.status === 200 && r.body.ok, "save: ok");
-  const bad = await call("/api/dsh-persona/save", { name: "kagura", file: "EVIL.md", content: "x" });
-  check(bad.status === 400, "save: unknown file rejected");
-  // activate again picks up the saved content
-  await call("/api/dsh-persona/activate", { name: "kagura" });
-  check(readFileSync(agentsPath, "utf8").includes("Be concise."), "activate reflects saved content");
+  // Edit SOUL.md directly on disk (as the agent would), then list → re-render.
+  writeFileSync(join(fakeHome, ".dsh", "souls", "kagura", "SOUL.md"), "# SOUL.md\n\nBe concise.\n");
+  const r = await call("/api/dsh-soul/list", {});
+  check(r.status === 200 && r.body.ok, "list after direct edit: ok");
+  check(readFileSync(agentsPath, "utf8").includes("Be concise."), "lazy sync: DNA edit re-aggregated into AGENTS.md");
 }
 
-// --- 5. delete rules ---------------------------------------------------------
+// --- 5. save (DNA + beliefs) + manifest --------------------------------------
 {
-  const r = await call("/api/dsh-persona/delete", { name: "kagura" });
-  check(r.status === 400, "delete: active persona rejected");
-  await call("/api/dsh-persona/new", { name: "other" });
-  const r2 = await call("/api/dsh-persona/delete", { name: "other" });
-  check(r2.status === 200 && r2.body.removed === "other", "delete: inactive persona removed");
-  check(!existsSync(join(fakeHome, ".dsh", "personas", "other")), "delete: pack directory gone");
+  const r = await call("/api/dsh-soul/save", { name: "kagura", file: "MEMORY.md", content: "# MEMORY.md\n\n- fact\n" });
+  check(r.status === 200 && r.body.ok, "save DNA: ok");
+  const r2 = await call("/api/dsh-soul/save", { name: "kagura", file: "beliefs/candidates.md", content: "# beliefs\n\n- lesson\n" });
+  check(r2.status === 200 && r2.body.ok, "save beliefs: ok");
+  check((await call("/api/dsh-soul/save", { name: "kagura", file: "../evil.md", content: "x" })).status === 400, "save: traversal rejected");
+  const manifest = JSON.parse(readFileSync(join(fakeHome, ".dsh", "souls", "kagura", "manifest.json"), "utf8"));
+  check(manifest.dnaChanges.length >= 1 && manifest.activations.length === 2, "manifest: dnaChanges + activations recorded");
+}
+
+// --- 6. avatar upload + fetch --------------------------------------------------
+{
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01, 0x02, 0x03]);
+  const req = {
+    url: "/api/dsh-soul/avatar-upload?name=kagura",
+    headers: { "content-type": "image/png" },
+    on(ev, cb) { if (ev === "data") cb(png); if (ev === "end") cb(); return this; },
+    destroy() {},
+  };
+  const res = fakeRes();
+  await byPath("/api/dsh-soul/avatar-upload").handler(req, res);
+  check(res.out.status === 200 && JSON.parse(res.out.body).avatar === "avatar.png", "avatar-upload: saved avatar.png");
+  const r2 = await call("/api/dsh-soul/avatar", { name: "kagura" });
+  check(r2.status === 200 && r2.buffer !== null && r2.buffer.length === png.length, "avatar: fetch returns image bytes");
+  const r3 = await call("/api/dsh-soul/list", {});
+  check(r3.body.souls[0].avatar === "avatar.png", "list: avatar reported");
+}
+
+// --- 7. delete rules ----------------------------------------------------------
+{
+  check((await call("/api/dsh-soul/delete", { name: "kagura" })).status === 400, "delete: active soul rejected");
+  await call("/api/dsh-soul/new", { name: "other" });
+  const r = await call("/api/dsh-soul/delete", { name: "other" });
+  check(r.status === 200 && r.body.removed === "other", "delete: inactive soul removed");
+  check(!existsSync(join(fakeHome, ".dsh", "souls", "other")), "delete: soul dir gone");
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURES`);

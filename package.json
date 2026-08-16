@@ -1,7 +1,7 @@
 {
-  "name": "dsh-persona",
+  "name": "dsh-soul",
   "version": "0.1.0",
-  "description": "DSH plugin: manage agent personalities — store persona packs (SOUL/IDENTITY/USER/AGENTS/MEMORY) separately, activate one to aggregate it into the global instruction layer ~/.dsh/AGENTS.md.",
+  "description": "DSH plugin: raise an evolving AI companion — soul DNA (SOUL/IDENTITY/USER/AGENTS/MEMORY) with beliefs pipeline, avatar, and one-click activation into the global instruction layer.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -11,7 +11,10 @@
   },
   "dsh": {
     "client": {
-      "inject": ["slots", "locale"],
+      "inject": [
+        "slots",
+        "locale"
+      ],
       "platform": "web",
       "immediately": true
     }

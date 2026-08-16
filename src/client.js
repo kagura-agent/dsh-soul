@@ -1,65 +1,79 @@
-// dsh-persona client half — persona management card in the settings plugin list.
+// dsh-soul client half — soul management card in the settings plugin list.
 //
-// Lists persona packs stored under ~/.dsh/personas/, shows which one is active
-// (aggregated into ~/.dsh/AGENTS.md), and offers: activate / new / delete.
-// All work happens through the host half's /api/dsh-persona/* routes.
-// UI copy is localized through the host locale service (en + zh dictionaries).
+// Lists soul packs under ~/.dsh/souls/, shows the active one (rendered into
+// ~/.dsh/AGENTS.md) with its avatar, and offers activate / new / delete /
+// avatar upload. DNA and beliefs files are editable through the host save
+// route (full editor UI is a later step). UI copy is localized through the
+// host locale service (en + zh dictionaries).
 window.__ModuleLoader__.load({
-	id: "dsh-persona",
+	id: "dsh-soul",
 	factory: (require) => {
 		var module = { exports: {} };
 		var exports = module.exports;
 		var react = require("react");
 
-		const name = "dsh-persona-client";
+		const name = "dsh-soul-client";
 		const inject = ["slots", "locale"];
 
-		const API = "/api/dsh-persona";
-		/** Locale namespace owning this card's copy. */
-		const NS = "dsh-persona";
+		const API = "/api/dsh-soul";
+		const NS = "dsh-soul";
 		const zh = {
-			subtitle: "Agent 人格管理：多套人格存储 + 一键激活",
+			subtitle: "养一个会自进化的 AI 伙伴：灵魂 DNA + 经历 + 成长",
 			expand: "展开",
 			collapse: "收起",
-			active: "当前激活",
-			none: "（未激活人格）",
+			active: "当前灵魂",
+			none: "（未激活灵魂）",
 			activate: "激活",
-			activeBadge: "✓ 激活中",
-			noPersonas: "还没有人格包。输入名字新建一个，或先用 dsh-migrate-openclaw 导入。",
-			newPlaceholder: "新人格名字（如 kagura）",
-			create: "新建人格",
+			activeBadge: "✓ 陪伴中",
+			noSouls: "还没有灵魂。输入名字新建一个，或用 dsh-migrate-openclaw 导入。",
+			newPlaceholder: "灵魂名字（如 kagura）",
+			create: "新灵魂",
 			deleteBtn: "删除",
-			filesLabel: "文件",
+			dnaLabel: "DNA",
+			beliefsLabel: "信念候选",
+			notesLabel: "日记",
+			avatarLabel: "头像",
+			uploadAvatar: "上传头像",
+			avatarUploaded: "头像已更新（{avatar}）",
+			avatarMissing: "无头像",
 			refresh: "刷新",
 			busy: "处理中…",
 			err: "失败：{error}",
-			created: "已创建人格 {name}（骨架就绪，点「激活」生效）",
-			activated: "已激活 {name} → {target}（{bytes} 字节{backedUp}）\n{note}",
+			created: "已创建灵魂 {name}（骨架就绪，点「激活」开始陪伴）",
+			activated: "已激活 {name} → {target}（{bytes} 字节{backedUp}，第 {n} 次激活）\n{note}",
 			backedUp: "，旧文件已备份",
-			deleted: "已删除人格 {name}",
-			activeProtected: "不能删除激活中的人格",
+			deleted: "已删除灵魂 {name}",
+			activeProtected: "不能删除陪伴中的灵魂",
+			syncHint: "DNA 修改后自动重新聚合到 ~/.dsh/AGENTS.md（下次访问时生效）",
 		};
 		const en = {
-			subtitle: "Agent persona management: multiple personas, one-click activation",
+			subtitle: "Raise an evolving AI companion: soul DNA + experiences + growth",
 			expand: "Expand",
 			collapse: "Collapse",
-			active: "Active",
-			none: "(no persona active)",
+			active: "Active soul",
+			none: "(no soul active)",
 			activate: "Activate",
 			activeBadge: "✓ active",
-			noPersonas: "No persona packs yet. Enter a name to create one, or import one with dsh-migrate-openclaw first.",
-			newPlaceholder: "New persona name (e.g. kagura)",
-			create: "New persona",
+			noSouls: "No souls yet. Enter a name to create one, or import one with dsh-migrate-openclaw first.",
+			newPlaceholder: "Soul name (e.g. kagura)",
+			create: "New soul",
 			deleteBtn: "Delete",
-			filesLabel: "Files",
+			dnaLabel: "DNA",
+			beliefsLabel: "Beliefs",
+			notesLabel: "Notes",
+			avatarLabel: "Avatar",
+			uploadAvatar: "Upload avatar",
+			avatarUploaded: "Avatar updated ({avatar})",
+			avatarMissing: "no avatar",
 			refresh: "Refresh",
 			busy: "Working…",
 			err: "Failed: {error}",
-			created: "Created persona {name} (skeleton ready; hit Activate to apply)",
-			activated: "Activated {name} → {target} ({bytes} bytes{backedUp})\n{note}",
+			created: "Created soul {name} (skeleton ready; hit Activate to start)",
+			activated: "Activated {name} → {target} ({bytes} bytes{backedUp}, activation #{n})\n{note}",
 			backedUp: ", previous file backed up",
-			deleted: "Deleted persona {name}",
-			activeProtected: "Cannot delete the active persona",
+			deleted: "Deleted soul {name}",
+			activeProtected: "Cannot delete the active soul",
+			syncHint: "DNA edits re-aggregate into ~/.dsh/AGENTS.md automatically (on next visit)",
 		};
 
 		const styles = {
@@ -130,15 +144,28 @@ window.__ModuleLoader__.load({
 				fontSize: 12,
 				cursor: "pointer"
 			},
-			persona: {
+			soul: {
 				display: "flex",
 				alignItems: "center",
-				gap: 10,
-				padding: "8px 10px",
+				gap: 12,
+				padding: "10px",
 				border: "1px solid #e4e8ee",
 				borderRadius: 8,
 				margin: "6px 0",
 				background: "#fafbfc"
+			},
+			avatar: {
+				width: 40,
+				height: 40,
+				borderRadius: "50%",
+				objectFit: "cover",
+				background: "#eef1f5",
+				flex: "none",
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "center",
+				fontSize: 20,
+				color: "#8a94a3"
 			},
 			msg: { margin: "8px 0 0", whiteSpace: "pre-wrap", wordBreak: "break-word" },
 			ok: { color: "#1a7f37" },
@@ -146,13 +173,36 @@ window.__ModuleLoader__.load({
 			muted: { color: "#8a94a3", fontSize: 12 }
 		};
 
-		function PersonaCard({ ctx }) {
+		function AvatarImg({ soul }) {
+			const [src, setSrc] = react.useState(null);
+			react.useEffect(() => {
+				let cancelled = false;
+				if (!soul.avatar) { setSrc(null); return; }
+				fetch(API + "/avatar", {
+					method: "POST",
+					credentials: "same-origin",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ name: soul.name })
+				}).then((r) => r.blob()).then((blob) => {
+					if (!cancelled) setSrc(URL.createObjectURL(blob));
+				}).catch(() => { if (!cancelled) setSrc(null); });
+				return () => { cancelled = true; };
+			}, [soul.name, soul.avatar]);
+			if (src !== null) {
+				return react.createElement("img", { src, style: styles.avatar, alt: soul.name });
+			}
+			return react.createElement("div", { style: styles.avatar }, "🌸");
+		}
+
+		function SoulCard({ ctx }) {
 			const [open, setOpen] = react.useState(false);
 			const [busy, setBusy] = react.useState(false);
-			const [personas, setPersonas] = react.useState(null);
+			const [souls, setSouls] = react.useState(null);
 			const [active, setActive] = react.useState(null);
 			const [newName, setNewName] = react.useState("");
-			const [result, setResult] = react.useState(null); // { kind, text }
+			const [result, setResult] = react.useState(null);
+			const fileRef = react.useRef(null);
+			const uploadFor = react.useRef(null);
 
 			const t = ctx.locale.bind(NS);
 			const [, forceRender] = react.useReducer((x) => x + 1, 0);
@@ -166,39 +216,36 @@ window.__ModuleLoader__.load({
 					body: JSON.stringify(payload)
 				});
 				const data = await res.json().catch(() => ({}));
-				if (!res.ok || !data.ok) {
-					throw new Error((data && data.error) || `HTTP ${res.status}`);
-				}
+				if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
 				return data;
 			};
 
-			const load = async (silent) => {
+			const load = async () => {
 				try {
 					const data = await post("/list", {});
-					setPersonas(data.personas || []);
+					setSouls(data.souls || []);
 					setActive(data.active || null);
-					if (!silent) setResult(null);
 				} catch (error) {
 					setResult({ kind: "err", text: t("err", { error: error.message }) });
 				}
 			};
 
-			const runActivate = async (personaName) => {
+			const runActivate = async (soulName) => {
 				setBusy(true);
 				try {
-					const data = await post("/activate", { name: personaName });
-					setActive(personaName);
+					const data = await post("/activate", { name: soulName });
+					setActive(soulName);
 					setResult({
 						kind: "ok",
 						text: t("activated", {
-							name: personaName,
+							name: soulName,
 							target: data.target,
 							bytes: data.bytes,
 							backedUp: data.backedUp ? t("backedUp") : "",
-							note: data.note || ""
-						})
+							n: data.activations
+						}) + `\n${data.note || ""}`
 					});
-					await load(true);
+					await load();
 				} catch (error) {
 					setResult({ kind: "err", text: t("err", { error: error.message }) });
 				}
@@ -210,23 +257,51 @@ window.__ModuleLoader__.load({
 				if (!n) return;
 				setBusy(true);
 				try {
-					const data = await post("/new", { name: n });
+					await post("/new", { name: n });
 					setNewName("");
 					setResult({ kind: "ok", text: t("created", { name: n }) });
-					await load(true);
+					await load();
 				} catch (error) {
 					setResult({ kind: "err", text: t("err", { error: error.message }) });
 				}
 				setBusy(false);
 			};
 
-			const runDelete = async (personaName) => {
-				if (!window.confirm(`Delete persona "${personaName}"?`)) return;
+			const runDelete = async (soulName) => {
+				if (!window.confirm(`Delete soul "${soulName}"?`)) return;
 				setBusy(true);
 				try {
-					await post("/delete", { name: personaName });
-					setResult({ kind: "ok", text: t("deleted", { name: personaName }) });
-					await load(true);
+					await post("/delete", { name: soulName });
+					setResult({ kind: "ok", text: t("deleted", { name: soulName }) });
+					await load();
+				} catch (error) {
+					setResult({ kind: "err", text: t("err", { error: error.message }) });
+				}
+				setBusy(false);
+			};
+
+			const pickAvatar = (soulName) => {
+				uploadFor.current = soulName;
+				if (fileRef.current) fileRef.current.click();
+			};
+
+			const onAvatarFile = async (e) => {
+				const file = e.target.files && e.target.files[0];
+				e.target.value = "";
+				if (!file || !uploadFor.current) return;
+				const soulName = uploadFor.current;
+				setBusy(true);
+				try {
+					const res = await fetch(`${API}/avatar-upload?name=${encodeURIComponent(soulName)}`, {
+						method: "POST",
+						credentials: "same-origin",
+						headers: { "content-type": file.type },
+						body: file
+					});
+					const data = await res.json().catch(() => ({}));
+					if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+					setResult({ kind: "ok", text: t("avatarUploaded", { avatar: data.avatar }) });
+					await load();
 				} catch (error) {
 					setResult({ kind: "err", text: t("err", { error: error.message }) });
 				}
@@ -237,33 +312,38 @@ window.__ModuleLoader__.load({
 				react.createElement("article", { style: styles.article },
 					react.createElement("button", {
 						type: "button",
-						"aria-label": `${open ? t("collapse") : t("expand")}: dsh-persona`,
+						"aria-label": `${open ? t("collapse") : t("expand")}: dsh-soul`,
 						"aria-expanded": open,
-						onClick: () => { const next = !open; setOpen(next); if (next) void load(false); },
+						onClick: () => { const next = !open; setOpen(next); if (next) void load(); },
 						style: styles.headerBtn
 					},
 						react.createElement("div", { style: { flex: 1, minWidth: 0 } },
-							react.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "dsh-persona"),
+							react.createElement("div", { style: { fontSize: 15, fontWeight: 600 } }, "dsh-soul"),
 							react.createElement("div", { style: { fontSize: 13, color: "#8a94a3", marginTop: 2 } }, t("subtitle"))),
 						react.createElement("span", {
 							style: { color: "#8a94a3", fontSize: 12, transition: "transform .14s", transform: open ? "rotate(180deg)" : "none" }
 						}, "▾")),
 					open && react.createElement("div", { style: styles.body },
+						react.createElement("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif", ref: fileRef, style: { display: "none" }, onChange: onAvatarFile }),
 						react.createElement("div", { style: { fontWeight: 500, color: "#1c2024", margin: "4px 0 6px" } },
 							`${t("active")}: ${active || t("none")}`),
-						personas !== null && personas.length === 0 &&
-							react.createElement("p", { style: styles.muted }, t("noPersonas")),
-						personas !== null && personas.map((p) =>
-							react.createElement("div", { key: p.name, style: styles.persona },
+						souls !== null && souls.length === 0 &&
+							react.createElement("p", { style: styles.muted }, t("noSouls")),
+						souls !== null && souls.map((s) =>
+							react.createElement("div", { key: s.name, style: styles.soul },
+								react.createElement(AvatarImg, { soul: s }),
 								react.createElement("div", { style: { flex: 1, minWidth: 0 } },
 									react.createElement("div", { style: { fontWeight: 600, color: "#1c2024" } },
-										p.name + (p.active ? ` ${t("activeBadge")}` : "")),
+										s.name + (s.active ? ` ${t("activeBadge")}` : "")),
 									react.createElement("div", { style: styles.muted },
-										`${t("filesLabel")}: ${p.files.map((f) => f.name.replace(/\.md$/i, "")).join(", ") || "—"}`)),
-								!p.active &&
-									react.createElement("button", { style: styles.btnPrimary, onClick: () => runActivate(p.name), disabled: busy }, t("activate")),
-								!p.active &&
-									react.createElement("button", { style: styles.btnDanger, onClick: () => runDelete(p.name), disabled: busy }, t("deleteBtn")))),
+										`${t("dnaLabel")}: ${s.dna.map((f) => f.name.replace(/\.md$/i, "")).join(", ") || "—"}` +
+										(s.beliefsBytes > 0 ? ` · ${t("beliefsLabel")}: ${s.beliefsBytes}B` : "") +
+										` · ${t("notesLabel")}: ${s.notes}`)),
+								react.createElement("button", { style: styles.btn, onClick: () => pickAvatar(s.name), disabled: busy, title: t("uploadAvatar") }, "🖼️"),
+								!s.active &&
+									react.createElement("button", { style: styles.btnPrimary, onClick: () => runActivate(s.name), disabled: busy }, t("activate")),
+								!s.active &&
+									react.createElement("button", { style: styles.btnDanger, onClick: () => runDelete(s.name), disabled: busy }, t("deleteBtn")))),
 						react.createElement("div", { style: styles.row },
 							react.createElement("input", {
 								style: styles.input,
@@ -273,7 +353,8 @@ window.__ModuleLoader__.load({
 								onKeyDown: (e) => { if (e.key === "Enter") void runCreate(); }
 							}),
 							react.createElement("button", { style: styles.btnPrimary, onClick: runCreate, disabled: busy }, t("create")),
-							react.createElement("button", { style: styles.btn, onClick: () => load(false), disabled: busy }, t("refresh"))),
+							react.createElement("button", { style: styles.btn, onClick: load, disabled: busy }, t("refresh"))),
+						react.createElement("div", { style: { ...styles.muted, marginTop: 4 } }, t("syncHint")),
 						busy && react.createElement("p", { style: { ...styles.msg, color: "#1c2024" } }, t("busy")),
 						result !== null &&
 							react.createElement("p", { style: { ...styles.msg, ...(result.kind === "ok" ? styles.ok : styles.err) } }, result.text))));
@@ -284,11 +365,11 @@ window.__ModuleLoader__.load({
 			if (slots === void 0) return;
 			const locale = ctx.get("locale");
 			if (locale !== void 0) {
-				ctx.effect(() => locale.register(NS, { zh, en }), "dsh-persona: card dictionaries");
+				ctx.effect(() => locale.register(NS, { zh, en }), "dsh-soul: card dictionaries");
 			}
 			slots.inject("settings.plugin.item", () => slots.register(
-				{ name: "settings.plugin.item", id: "dsh-persona", order: 45, label: "dsh-persona" },
-				() => react.createElement(PersonaCard, { ctx })
+				{ name: "settings.plugin.item", id: "dsh-soul", order: 45, label: "dsh-soul" },
+				() => react.createElement(SoulCard, { ctx })
 			));
 		}
 
