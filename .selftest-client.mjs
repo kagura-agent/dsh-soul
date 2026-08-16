@@ -162,6 +162,7 @@ for (const part of splitTopFunctions(src)) {
   for (const m of rawBody.matchAll(/\(([^()]*)\)\s*=>/g)) for (const n of m[1].matchAll(/[A-Za-z_$][\w$]*/g)) local.add(n[0]);
   for (const m of rawBody.matchAll(/function\s+[A-Za-z_$][\w$]*\s*\(([^()]*)\)/g)) for (const n of m[1].matchAll(/[A-Za-z_$][\w$]*/g)) local.add(n[0]);
   for (const m of rawBody.matchAll(/(?:constructor|render|componentDidCatch|getDerivedStateFromError)\s*\(([^()]*)\)/g)) for (const n of m[1].matchAll(/[A-Za-z_$][\w$]*/g)) local.add(n[0]);
+  for (const m of rawBody.matchAll(/catch\s*\(([^()]*)\)/g)) for (const n of m[1].matchAll(/[A-Za-z_$][\w$]*/g)) local.add(n[0]);
   for (const m of rawBody.matchAll(/class\s+([A-Za-z_$][\w$]*)/g)) local.add(m[1]);
   // a function's own destructured params: function Name({ ctx, wide })
   for (const m of rawBody.matchAll(/function\s+[A-Za-z_$][\w$]*\s*\(([^()]*)\)/g)) for (const n of m[1].matchAll(/[A-Za-z_$][\w$]*/g)) local.add(n[0]);

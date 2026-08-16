@@ -49,6 +49,8 @@ window.__ModuleLoader__.load({
 			uploadAvatar: "上传头像",
 			edit: "编辑",
 			backToList: "← 返回",
+			detailTitle: "灵魂配置",
+			close: "关闭",
 			save: "保存",
 			editingHint: "保存后自动重新聚合到 ~/.dsh/AGENTS.md",
 			saved: "已保存 {file}",
@@ -90,6 +92,8 @@ window.__ModuleLoader__.load({
 			uploadAvatar: "Upload avatar",
 			edit: "Edit",
 			backToList: "← Back",
+			detailTitle: "Soul config",
+			close: "Close",
 			save: "Save",
 			editingHint: "Saving re-aggregates into ~/.dsh/AGENTS.md automatically",
 			saved: "Saved {file}",
@@ -443,6 +447,7 @@ window.__ModuleLoader__.load({
 		function ActiveSoulBadge({ ctx, wide }) {
 			const [soul, setSoul] = react.useState(null);
 			const [souls, setSouls] = react.useState(null);
+			const [detailName, setDetailName] = react.useState(null); // open config modal
 			const [avatarSrc, setAvatarSrc] = react.useState(null);
 			const [open, setOpen] = react.useState(false);
 			const [busy, setBusy] = react.useState(false);
@@ -585,13 +590,22 @@ window.__ModuleLoader__.load({
 							color: "inherit",
 							textAlign: "left"
 						},
-						onClick: () => switchTo(x.name),
+						onClick: () => setDetailName(x.name),
 						disabled: busy
 					},
 						react.createElement(SoulFace, { soul: x }),
 						react.createElement("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: x.active ? 600 : 400 } },
 							x.name + (x.active ? " ✓" : "")));
-					return react.createElement("div", { key: x.name, style: { display: "flex", alignItems: "center", gap: 8 } }, rowBtn);
+					const switchBtn = !x.active
+						? react.createElement("button", {
+							type: "button",
+							style: { padding: "3px 7px", border: "1px solid #d4d9e0", borderRadius: 6, background: "none", cursor: "pointer", fontSize: 11, color: "#5a6472", font: "inherit" },
+							onClick: () => switchTo(x.name),
+							disabled: busy,
+							title: t("activate")
+						}, t("activate"))
+						: null;
+					return react.createElement("div", { key: x.name, style: { display: "flex", alignItems: "center", gap: 6 } }, rowBtn, switchBtn);
 				}),
 				);
 
@@ -603,6 +617,8 @@ window.__ModuleLoader__.load({
 
 			return react.createElement(react.Fragment, null,
 				badgeBtn,
+				detailName !== null &&
+					react.createElement(SoulDetailModal, { ctx, soulName: detailName, onClose: () => { setDetailName(null); refresh(); } }),
 				open && react.createElement(react.Fragment, null, overlay, panel));
 		}
 
@@ -684,6 +700,164 @@ window.__ModuleLoader__.load({
 					react.createElement("button", { type: "button", style: { padding: "6px 14px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: saveEdit, disabled: busy || editing.loading }, t("save")),
 					react.createElement("button", { type: "button", style: { padding: "6px 14px", border: "1px solid #c9d1dc", borderRadius: 8, background: "#f6f8fa", color: "#1c2024", fontSize: 13, cursor: "pointer", font: "inherit" }, onClick: () => setEditing(null), disabled: busy }, t("backToList")),
 					react.createElement("span", { style: { color: "#8a94a3", fontSize: 12 } }, t("editingHint"))));
+		}
+
+		/** Large soul-config modal: the full editing surface for one soul,
+		 * shown over the main area instead of buried in settings. */
+		function SoulDetailModal({ ctx, soulName, onClose }) {
+			const [busy, setBusy] = react.useState(false);
+			const [active, setActive] = react.useState(false);
+			const [file, setFile] = react.useState("SOUL.md");
+			const [content, setContent] = react.useState("");
+			const [loading, setLoading] = react.useState(true);
+			const fileRef = react.useRef(null);
+			const t = ctx.locale.bind(NS);
+			const [, forceRender] = react.useReducer((x) => x + 1, 0);
+			react.useEffect(() => ctx.locale.subscribe(() => forceRender()), [ctx]);
+
+			const post = async (path, payload) => {
+				const res = await fetch(API + path, {
+					method: "POST",
+					credentials: "same-origin",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify(payload)
+				});
+				const data = await res.json().catch(() => ({}));
+				if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+				return data;
+			};
+
+			const loadFile = async (f) => {
+				setFile(f);
+				setLoading(true);
+				try {
+					const data = await post("/get", { name: soulName, file: f });
+					setContent(data.content || "");
+				} catch (e) {
+					window.alert(t("loadFailed", { error: e.message }));
+				}
+				setLoading(false);
+			};
+
+			const saveFile = async () => {
+				setBusy(true);
+				try {
+					await post("/save", { name: soulName, file, content });
+					window.alert(t("saved", { file }) + " — " + t("editingHint"));
+				} catch (e) {
+					window.alert(e.message);
+				}
+				setBusy(false);
+			};
+
+			const activateSoul = async () => {
+				setBusy(true);
+				try {
+					await post("/activate", { name: soulName });
+					setActive(true);
+				} catch (e) {
+					window.alert(e.message);
+				}
+				setBusy(false);
+			};
+
+			const pickAvatar = () => { if (fileRef.current) fileRef.current.click(); };
+			const onAvatarFile = async (e) => {
+				const f = e.target.files && e.target.files[0];
+				e.target.value = "";
+				if (!f) return;
+				setBusy(true);
+				try {
+					const res = await fetch(`${API}/avatar-upload?name=${encodeURIComponent(soulName)}`, {
+						method: "POST",
+						credentials: "same-origin",
+						headers: { "content-type": f.type },
+						body: f
+					});
+					const data = await res.json().catch(() => ({}));
+					if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+					window.alert(t("avatarUploaded", { avatar: data.avatar }));
+					forceRender();
+				} catch (err) {
+					window.alert(err.message);
+				}
+				setBusy(false);
+			};
+
+			react.useEffect(() => { void loadFile("SOUL.md"); }, []);
+
+			const files = ["IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "MEMORY.md", "beliefs/candidates.md"];
+			const overlay = { position: "fixed", inset: 0, zIndex: 1000, background: "rgba(15,20,28,.45)", display: "flex", alignItems: "center", justifyContent: "center" };
+			const panel = {
+				width: "min(860px, calc(100vw - 32px))",
+				height: "min(80vh, 720px)",
+				background: "#fff",
+				borderRadius: 16,
+				boxShadow: "0 16px 48px rgba(0,0,0,.25)",
+				display: "flex",
+				flexDirection: "column",
+				overflow: "hidden",
+				color: "#1c2024",
+				fontSize: 13
+			};
+			const header = { display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderBottom: "1px solid #e4e8ee", flex: "none" };
+			const face = { width: 40, height: 40, borderRadius: "50%", objectFit: "cover", background: "#eef1f5", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer" };
+			const tabs = { display: "flex", gap: 4, flexWrap: "wrap", padding: "10px 18px 0" };
+			const tabStyle = (f) => ({
+				padding: "5px 10px",
+				border: f === file ? "1px solid #1f6feb" : "1px solid #d4d9e0",
+				borderRadius: 7,
+				background: f === file ? "#e8f0fe" : "#f6f8fa",
+				color: "#1c2024",
+				fontSize: 12,
+				cursor: "pointer",
+				font: "inherit"
+			});
+			const body = { flex: 1, minHeight: 0, padding: "10px 18px 14px", display: "flex", flexDirection: "column" };
+			const ta = {
+				flex: 1,
+				minHeight: 0,
+				boxSizing: "border-box",
+				width: "100%",
+				padding: "10px",
+				border: "1px solid #d4d9e0",
+				borderRadius: 8,
+				fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+				fontSize: 12.5,
+				lineHeight: 1.5,
+				outline: "none",
+				resize: "none",
+				background: "#fafbfc",
+				color: "#1c2024"
+			};
+			const footer = { display: "flex", gap: 8, alignItems: "center", padding: "10px 18px 14px", borderTop: "1px solid #e4e8ee", flex: "none" };
+
+			return react.createElement("div", { style: overlay, onClick: (e) => { if (e.target === e.currentTarget) onClose(); } },
+				react.createElement("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif", ref: fileRef, style: { display: "none" }, onChange: onAvatarFile }),
+				react.createElement("div", { style: panel },
+					react.createElement("div", { style: header },
+						react.createElement("button", { type: "button", style: { padding: 0, border: 0, background: "none", cursor: "pointer", borderRadius: "50%", lineHeight: 0 }, onClick: pickAvatar, title: t("uploadAvatar") },
+							react.createElement(SoulFace, { soul: { name: soulName, avatar: null } })),
+						react.createElement("div", { style: { flex: 1, minWidth: 0 } },
+							react.createElement("div", { style: { fontWeight: 600, fontSize: 15 } }, soulName),
+							react.createElement("div", { style: { fontSize: 12, color: "#8a94a3" } }, active ? t("activeBadge") : t("detailTitle"))),
+						!active &&
+							react.createElement("button", { type: "button", style: { padding: "6px 12px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: activateSoul, disabled: busy }, t("activate")),
+						react.createElement("button", { type: "button", style: { padding: "6px 10px", border: "1px solid #c9d1dc", borderRadius: 8, background: "#f6f8fa", color: "#1c2024", fontSize: 12, cursor: "pointer", font: "inherit" }, onClick: onClose }, t("close"))),
+					react.createElement("div", { style: tabs },
+						files.map((f) =>
+							react.createElement("button", { key: f, type: "button", style: tabStyle(f), onClick: () => loadFile(f), disabled: busy || loading }, f.replace(/\.md$/i, "")))),
+					react.createElement("div", { style: body },
+						react.createElement("textarea", {
+							style: ta,
+							value: loading ? "" : content,
+							placeholder: loading ? t("busy") : "",
+							disabled: loading || busy,
+							onChange: (e) => setContent(e.target.value)
+						})),
+					react.createElement("div", { style: footer },
+						react.createElement("button", { type: "button", style: { padding: "7px 16px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: saveFile, disabled: busy || loading }, t("save")),
+						react.createElement("span", { style: { fontSize: 12, color: "#8a94a3" } }, t("editingHint")))));
 		}
 
 		/** Error boundary: a crash in the card or badge shows the error text
