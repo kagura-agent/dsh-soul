@@ -1,5 +1,7 @@
 # dsh-soul
 
+[中文版](README.zh.md)
+
 **Raise an evolving AI companion inside DSH.** A soul is a living persona: DNA files (`SOUL.md` / `IDENTITY.md` / `USER.md` / `AGENTS.md` / `MEMORY.md`) that define who she is, an evolution pipeline (`beliefs/`) where lessons graduate into DNA, a daily-note layer (`memory/`), an avatar — and a manifest recording how she grew.
 
 Companion to [dsh-migrate-openclaw](https://github.com/kagura-agent/dsh-migrate-openclaw): migrate an OpenClaw persona in, then raise her here.
