@@ -499,12 +499,15 @@ function apply(ctx, config) {
     // --- daily notes: real ones only (YYYY-MM-DD*.md), newest last ----------
     let notes = []; // { name, date, preview }
     let notesCount = 0;
+    let notesSpan = null; // { first, last }
     try {
       const mp = join(dir, "memory");
       if (existsSync(mp)) {
         const files = readdirSync(mp).filter((n) => /^\d{4}-\d{2}-\d{2}/.test(n) && n.endsWith(".md"));
         notesCount = files.length;
-        const newest = files.sort().slice(-5).reverse();
+        const sorted = files.sort();
+        if (sorted.length > 0) notesSpan = { first: sorted[0].slice(0, 10), last: sorted[sorted.length - 1].slice(0, 10) };
+        const newest = sorted.slice(-8).reverse();
         for (const f of newest) {
           let preview = "";
           try {
@@ -534,7 +537,7 @@ function apply(ctx, config) {
           }
         }
         beliefsCount = entries.length;
-        beliefsRecent = entries.slice(-5).reverse();
+        beliefsRecent = entries.slice(-8).reverse();
       }
     } catch { /* ignore */ }
 
@@ -573,6 +576,7 @@ function apply(ctx, config) {
       manifest,
       born,
       notesCount,
+      notesSpan,
       beliefsCount,
       monthly,
       notes,
