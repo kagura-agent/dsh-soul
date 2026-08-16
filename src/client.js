@@ -393,58 +393,10 @@ window.__ModuleLoader__.load({
 						react.createElement("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif", ref: fileRef, style: { display: "none" }, onChange: onAvatarFile }),
 						react.createElement("div", { style: { fontWeight: 500, color: "#1c2024", margin: "4px 0 6px" } },
 							`${t("active")}: ${active || t("none")}`),
-						editing !== null && react.createElement("div", { style: { marginTop: 6 } },
-							react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } },
-								react.createElement("button", { type: "button", style: styles.btn, onClick: () => setEditing(null), disabled: busy }, t("backToList")),
-								react.createElement("span", { style: { fontWeight: 600, color: "#1c2024" } }, editing.name)),
-							react.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 } },
-								["IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "MEMORY.md", "beliefs/candidates.md"].map((f) =>
-									react.createElement("button", {
-										key: f,
-										type: "button",
-										style: {
-											padding: "4px 8px",
-											border: f === editing.file ? "1px solid #1f6feb" : "1px solid #d4d9e0",
-											borderRadius: 6,
-											background: f === editing.file ? "#e8f0fe" : "#f6f8fa",
-											color: "#1c2024",
-											fontSize: 11,
-											cursor: "pointer",
-											font: "inherit"
-										},
-										onClick: () => switchFile(f),
-										disabled: busy || editing.loading
-									}, f.replace(/\.md$/i, "").replace("beliefs/", "beliefs/")))),
-							react.createElement("textarea", {
-								style: {
-									width: "100%",
-									boxSizing: "border-box",
-									minHeight: 200,
-									maxHeight: 360,
-									padding: "8px",
-									border: "1px solid #d4d9e0",
-									borderRadius: 8,
-									fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-									fontSize: 12,
-									lineHeight: 1.5,
-									outline: "none",
-									resize: "vertical",
-									color: "#1c2024",
-									background: "#fafbfc"
-								},
-								value: editing.loading ? "" : editing.content,
-								placeholder: editing.loading ? t("busy") : "",
-								disabled: editing.loading || busy,
-								onChange: (e) => setEditing({ ...editing, content: e.target.value })
-							}),
-							react.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6, alignItems: "center" } },
-								react.createElement("button", { type: "button", style: styles.btnPrimary, onClick: saveEdit, disabled: busy || editing.loading }, t("save")),
-								react.createElement("button", { type: "button", style: styles.btn, onClick: () => setEditing(null), disabled: busy }, t("backToList")),
-								react.createElement("span", { style: styles.muted }, t("editingHint")))),
-						souls !== null && souls.length === 0 &&
-							react.createElement("p", { style: styles.muted }, t("noSouls")),
-						souls !== null && souls.map((s) =>
-							react.createElement("div", { key: s.name, style: styles.soul },
+												souls !== null && souls.map((s) => {
+							const isEditing = editing !== null && editing.name === s.name;
+							return react.createElement(react.Fragment, { key: s.name },
+							react.createElement("div", { style: { ...styles.soul, ...(isEditing ? { borderColor: "#1f6feb" } : {}) } },
 								react.createElement("button", {
 									type: "button",
 									style: { padding: 0, border: 0, background: "none", cursor: "pointer", borderRadius: "50%", flex: "none", lineHeight: 0 },
@@ -463,7 +415,10 @@ window.__ModuleLoader__.load({
 								!s.active &&
 									react.createElement("button", { style: styles.btnPrimary, onClick: () => runActivate(s.name), disabled: busy }, t("activate")),
 								!s.active &&
-									react.createElement("button", { style: styles.btnDanger, onClick: () => runDelete(s.name), disabled: busy }, t("deleteBtn")))),
+									react.createElement("button", { style: styles.btnDanger, onClick: () => runDelete(s.name), disabled: busy }, t("deleteBtn"))),
+							isEditing &&
+								react.createElement(EditorSection, { editing, busy, t, switchFile, saveEdit, setEditing }));
+						}),
 						react.createElement("div", { style: styles.row },
 							react.createElement("input", {
 								style: styles.input,
@@ -670,6 +625,65 @@ window.__ModuleLoader__.load({
 			const style = { width: 22, height: 22, borderRadius: "50%", objectFit: "cover", background: "#eef1f5", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 };
 			if (src !== null) return react.createElement("img", { src, style, alt: soul.name });
 			return react.createElement("div", { style }, "🌸");
+		}
+
+		/** Inline editor section: file tabs + textarea + save, shown under the edited row. */
+		function EditorSection({ editing, busy, t, switchFile, saveEdit, setEditing }) {
+			const files = ["IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "MEMORY.md", "beliefs/candidates.md"];
+			return react.createElement("div", {
+				style: {
+					margin: "2px 0 8px",
+					padding: "8px 10px",
+					border: "1px solid #d4d9e0",
+					borderLeft: "3px solid #1f6feb",
+					borderRadius: 8,
+					background: "#fafbfc"
+				}
+			},
+				react.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 } },
+					files.map((f) =>
+						react.createElement("button", {
+							key: f,
+							type: "button",
+							style: {
+								padding: "4px 8px",
+								border: f === editing.file ? "1px solid #1f6feb" : "1px solid #d4d9e0",
+								borderRadius: 6,
+								background: f === editing.file ? "#e8f0fe" : "#f6f8fa",
+								color: "#1c2024",
+								fontSize: 11,
+								cursor: "pointer",
+								font: "inherit"
+							},
+							onClick: () => switchFile(f),
+							disabled: busy || editing.loading
+						}, f.replace(/\.md$/i, "")))),
+				react.createElement("textarea", {
+					style: {
+						width: "100%",
+						boxSizing: "border-box",
+						minHeight: 200,
+						maxHeight: 360,
+						padding: "8px",
+						border: "1px solid #d4d9e0",
+						borderRadius: 8,
+						fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+						fontSize: 12,
+						lineHeight: 1.5,
+						outline: "none",
+						resize: "vertical",
+						color: "#1c2024",
+						background: "#fff"
+					},
+					value: editing.loading ? "" : editing.content,
+					placeholder: editing.loading ? t("busy") : "",
+					disabled: editing.loading || busy,
+					onChange: (e) => setEditing({ ...editing, content: e.target.value })
+				}),
+				react.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6, alignItems: "center" } },
+					react.createElement("button", { type: "button", style: { padding: "6px 14px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: saveEdit, disabled: busy || editing.loading }, t("save")),
+					react.createElement("button", { type: "button", style: { padding: "6px 14px", border: "1px solid #c9d1dc", borderRadius: 8, background: "#f6f8fa", color: "#1c2024", fontSize: 13, cursor: "pointer", font: "inherit" }, onClick: () => setEditing(null), disabled: busy }, t("backToList")),
+					react.createElement("span", { style: { color: "#8a94a3", fontSize: 12 } }, t("editingHint"))));
 		}
 
 		/** Error boundary: a crash in the card or badge shows the error text
