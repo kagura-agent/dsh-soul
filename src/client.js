@@ -386,8 +386,6 @@ window.__ModuleLoader__.load({
 			const [souls, setSouls] = react.useState(null);
 			const [avatarSrc, setAvatarSrc] = react.useState(null);
 			const [open, setOpen] = react.useState(false);
-			const [creating, setCreating] = react.useState(false);
-			const [newName, setNewName] = react.useState("");
 			const [busy, setBusy] = react.useState(false);
 			const t = ctx.locale.bind(NS);
 			const [, forceRender] = react.useReducer((x) => x + 1, 0);
@@ -420,22 +418,6 @@ window.__ModuleLoader__.load({
 			};
 			react.useEffect(() => { refresh(); const iv = setInterval(refresh, 30000); return () => clearInterval(iv); }, []);
 
-			const createSoul = async () => {
-				const n = newName.trim();
-				if (!n) {
-					window.alert(t("createNeedsName"));
-					return;
-				}
-				setBusy(true);
-				try {
-					await post("/new", { name: n });
-					await switchTo(n);
-				} catch (e) {
-					window.alert(e.message);
-				}
-				setBusy(false);
-			};
-
 			const switchTo = async (name) => {
 				setBusy(true);
 				try {
@@ -449,8 +431,8 @@ window.__ModuleLoader__.load({
 			};
 
 			const face = {
-				width: 22,
-				height: 22,
+				width: wide ? 16 : 18,
+				height: wide ? 16 : 18,
 				borderRadius: "50%",
 				objectFit: "cover",
 				background: "#eef1f5",
@@ -504,7 +486,7 @@ window.__ModuleLoader__.load({
 				avatarSrc !== null
 					? react.createElement("img", { src: avatarSrc, style: face, alt: soul ? soul.name : "" })
 					: react.createElement("div", { style: face }, "🌸"),
-				wide && react.createElement("span", { style: { fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1c2024" } },
+				wide && react.createElement("span", { style: { fontSize: 14, fontWeight: 400, lineHeight: 22, whiteSpace: "nowrap", overflow: "hidden", color: "#1c2024" } },
 					soul ? soul.name : t("badgeNoSoul")));
 
 			const panel = react.createElement("div", {
@@ -552,46 +534,8 @@ window.__ModuleLoader__.load({
 							x.name + (x.active ? " ✓" : "")));
 					return react.createElement("div", { key: x.name, style: { display: "flex", alignItems: "center", gap: 8 } }, rowBtn);
 				}),
-				react.createElement("div", { style: { marginTop: 8, paddingTop: 8, borderTop: "1px solid #eef1f5" } },
-					!creating
-						? react.createElement("button", {
-							type: "button",
-							style: {
-								display: "flex",
-								alignItems: "center",
-								gap: 8,
-								width: "100%",
-								padding: "5px 8px",
-								border: 0,
-								borderRadius: 6,
-								background: "none",
-								cursor: "pointer",
-								font: "inherit",
-								color: "#1c2024",
-								textAlign: "left"
-							},
-							onClick: () => setCreating(true)
-						}, t("newSoulEntry"))
-						: react.createElement("div", { style: { display: "flex", gap: 6 } },
-							react.createElement("input", {
-								style: { flex: 1, minWidth: 0, boxSizing: "border-box", padding: "5px 8px", border: "1px solid #d4d9e0", borderRadius: 6, fontSize: 12, outline: "none", font: "inherit" },
-								value: newName,
-								placeholder: t("newPlaceholder"),
-								autoFocus: true,
-								onChange: (e) => setNewName(e.target.value),
-								onKeyDown: (e) => { if (e.key === "Enter") void createSoul(); if (e.key === "Escape") setCreating(false); }
-							}),
-							react.createElement("button", {
-								type: "button",
-								style: { padding: "5px 10px", border: 0, borderRadius: 6, background: "#1f6feb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", font: "inherit" },
-								onClick: createSoul,
-								disabled: busy
-							}, t("create")),
-							react.createElement("button", {
-								type: "button",
-								style: { padding: "5px 8px", border: "1px solid #d4d9e0", borderRadius: 6, background: "none", cursor: "pointer", fontSize: 12, color: "#5a6472", font: "inherit" },
-								onClick: () => setCreating(false)
-							}, t("cancel")))));
+				);
+
 
 			const overlay = react.createElement("div", {
 				style: { position: "fixed", inset: 0, zIndex: 999, background: "transparent" },
