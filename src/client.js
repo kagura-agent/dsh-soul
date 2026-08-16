@@ -365,13 +365,32 @@ window.__ModuleLoader__.load({
 		}
 
 
-		/** Sidebar footer badge: the active soul's face, always visible. */
+		/** Sidebar footer badge + soul switcher: the active soul's face is
+		 * always visible; clicking opens a panel to switch souls or create one —
+		 * the same management actions as the settings card, reachable from
+		 * wherever the human is talking. */
 		function ActiveSoulBadge({ ctx, wide }) {
-			const [soul, setSoul] = react.useState(null); // { name, avatar } | null
+			const [soul, setSoul] = react.useState(null);
+			const [souls, setSouls] = react.useState(null);
 			const [avatarSrc, setAvatarSrc] = react.useState(null);
+			const [open, setOpen] = react.useState(false);
+			const [busy, setBusy] = react.useState(false);
+			const [newName, setNewName] = react.useState("");
 			const t = ctx.locale.bind(NS);
 			const [, forceRender] = react.useReducer((x) => x + 1, 0);
 			react.useEffect(() => ctx.locale.subscribe(() => forceRender()), [ctx]);
+
+			const post = async (path, payload) => {
+				const res = await fetch(API + path, {
+					method: "POST",
+					credentials: "same-origin",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify(payload)
+				});
+				const data = await res.json().catch(() => ({}));
+				if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+				return data;
+			};
 
 			const refresh = () => {
 				fetch(API + "/list", {
@@ -380,7 +399,9 @@ window.__ModuleLoader__.load({
 					headers: { "content-type": "application/json" },
 					body: JSON.stringify({})
 				}).then((r) => r.json()).then((data) => {
-					const active = (data.souls || []).find((s) => s.active) || null;
+					const list = data.souls || [];
+					setSouls(list);
+					const active = list.find((x) => x.active) || null;
 					setSoul(active);
 					if (active && active.avatar) {
 						return fetch(API + "/avatar", {
@@ -398,23 +419,35 @@ window.__ModuleLoader__.load({
 			};
 			react.useEffect(() => { refresh(); const iv = setInterval(refresh, 30000); return () => clearInterval(iv); }, []);
 
-			const badgeStyle = {
-				display: "flex",
-				alignItems: "center",
-				gap: 8,
-				width: "100%",
-				boxSizing: "border-box",
-				padding: wide ? "8px 10px" : "6px 0",
-				border: 0,
-				background: "none",
-				cursor: "pointer",
-				color: "#1c2024",
-				font: "inherit",
-				textAlign: "left"
+			const switchTo = async (name) => {
+				setBusy(true);
+				try {
+					await post("/activate", { name });
+					setOpen(false);
+					refresh();
+				} catch (e) {
+					window.alert(e.message);
+				}
+				setBusy(false);
 			};
+
+			const createSoul = async () => {
+				const n = newName.trim();
+				if (!n) return;
+				setBusy(true);
+				try {
+					await post("/new", { name: n });
+					setNewName("");
+					await switchTo(n);
+				} catch (e) {
+					window.alert(e.message);
+				}
+				setBusy(false);
+			};
+
 			const face = {
-				width: wide ? 28 : 22,
-				height: wide ? 28 : 22,
+				width: wide ? 24 : 20,
+				height: wide ? 24 : 20,
 				borderRadius: "50%",
 				objectFit: "cover",
 				background: "#eef1f5",
@@ -422,20 +455,126 @@ window.__ModuleLoader__.load({
 				display: "flex",
 				alignItems: "center",
 				justifyContent: "center",
-				fontSize: 14,
+				fontSize: 12,
 				color: "#8a94a3"
 			};
-			return react.createElement("button", {
+
+			const badgeBtn = react.createElement("button", {
 				type: "button",
-				style: badgeStyle,
+				style: {
+					display: "flex",
+					alignItems: "center",
+					gap: 8,
+					width: "100%",
+					boxSizing: "border-box",
+					padding: wide ? "6px 8px" : "4px 0",
+					border: 0,
+					background: "none",
+					cursor: "pointer",
+					color: "#1c2024",
+					font: "inherit",
+					textAlign: "left",
+					justifyContent: wide ? "flex-start" : "center"
+				},
 				title: soul ? t("badgeTitle", { name: soul.name }) : t("badgeNoSoul"),
-				onClick: () => { /* future: open soul switcher */ }
+				onClick: () => setOpen(!open)
 			},
 				avatarSrc !== null
 					? react.createElement("img", { src: avatarSrc, style: face, alt: soul ? soul.name : "" })
 					: react.createElement("div", { style: face }, "🌸"),
-				wide && react.createElement("span", { style: { fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+				wide && react.createElement("span", { style: { fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
 					soul ? soul.name : t("badgeNoSoul")));
+
+			const panel = react.createElement("div", {
+				style: {
+					position: "fixed",
+					bottom: 60,
+					left: 8,
+					zIndex: 1000,
+					width: "min(300px, calc(100vw - 16px))",
+					maxHeight: "min(60vh, 420px)",
+					overflowY: "auto",
+					background: "#fff",
+					border: "1px solid #d4d9e0",
+					borderRadius: 10,
+					boxShadow: "0 8px 24px rgba(0,0,0,.18)",
+					padding: "10px",
+					fontSize: 13,
+					color: "#1c2024"
+				}
+			},
+				react.createElement("div", { style: { fontWeight: 600, marginBottom: 6 } }, t("subtitle")),
+				souls !== null && souls.length === 0 &&
+					react.createElement("div", { style: { color: "#8a94a3" } }, t("noSouls")),
+				souls !== null && souls.map((x) => {
+					const rowBtn = react.createElement("button", {
+						type: "button",
+						style: {
+							display: "flex",
+							alignItems: "center",
+							gap: 8,
+							width: "100%",
+							padding: "6px 8px",
+							border: 0,
+							borderRadius: 8,
+							background: "none",
+							cursor: "pointer",
+							font: "inherit",
+							color: "inherit",
+							textAlign: "left"
+						},
+						onClick: () => switchTo(x.name),
+						disabled: busy
+					},
+						react.createElement(SoulFace, { soul: x }),
+						react.createElement("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: x.active ? 600 : 400 } },
+							x.name + (x.active ? " ✓" : "")));
+					return react.createElement("div", { key: x.name, style: { display: "flex", alignItems: "center", gap: 8 } }, rowBtn);
+				}),
+				react.createElement("div", { style: { display: "flex", gap: 6, marginTop: 8, paddingTop: 8, borderTop: "1px solid #eef1f5" } },
+					react.createElement("input", {
+						style: { flex: 1, minWidth: 0, boxSizing: "border-box", padding: "6px 8px", border: "1px solid #d4d9e0", borderRadius: 8, fontSize: 12, outline: "none" },
+						value: newName,
+						placeholder: t("newPlaceholder"),
+						onChange: (e) => setNewName(e.target.value),
+						onKeyDown: (e) => { if (e.key === "Enter") void createSoul(); }
+					}),
+					react.createElement("button", {
+						type: "button",
+						style: { padding: "6px 10px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" },
+						onClick: createSoul,
+						disabled: busy
+					}, t("create"))));
+
+			const overlay = react.createElement("div", {
+				style: { position: "fixed", inset: 0, zIndex: 999, background: "transparent" },
+				onClick: () => setOpen(false)
+			});
+
+			return react.createElement(react.Fragment, null,
+				badgeBtn,
+				open && react.createElement(react.Fragment, null, overlay, panel));
+		}
+
+		/** Small round face used inside the switcher list. */
+		function SoulFace({ soul }) {
+			const [src, setSrc] = react.useState(null);
+			react.useEffect(() => {
+				let cancelled = false;
+				if (!soul.avatar) { setSrc(null); return; }
+				fetch(API + "/avatar", {
+					method: "POST",
+					credentials: "same-origin",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ name: soul.name })
+				}).then((r) => r.blob()).then((blob) => {
+					if (!cancelled) setSrc(URL.createObjectURL(blob));
+				}).catch(() => { if (!cancelled) setSrc(null); });
+				return () => { cancelled = true; };
+			}, [soul.name, soul.avatar]);
+			const style = { width: 22, height: 22, borderRadius: "50%", objectFit: "cover", background: "#eef1f5", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 };
+			if (src !== null) return react.createElement("img", { src, style, alt: soul.name });
+			return react.createElement("div", { style }, "🌸");
 		}
 
 		function apply(ctx) {
