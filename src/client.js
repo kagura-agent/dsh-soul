@@ -48,6 +48,8 @@ window.__ModuleLoader__.load({
 			badgeNoSoul: "未激活灵魂",
 			badgeTitle: "当前灵魂：{name}",
 			newSoulEntry: "新建灵魂…",
+			createNeedsName: "先输入一个名字",
+			openSettingsFailed: "无法打开设置：{error}",
 		};
 		const en = {
 			subtitle: "Raise an evolving AI companion: soul DNA + experiences + growth",
@@ -80,6 +82,8 @@ window.__ModuleLoader__.load({
 			badgeNoSoul: "No soul active",
 			badgeTitle: "Active soul: {name}",
 			newSoulEntry: "New soul…",
+			createNeedsName: "Enter a name first",
+			openSettingsFailed: "Could not open settings: {error}",
 		};
 
 		const styles = {
@@ -247,7 +251,10 @@ window.__ModuleLoader__.load({
 
 			const runCreate = async () => {
 				const n = newName.trim();
-				if (!n) return;
+				if (!n) {
+					setResult({ kind: "err", text: t("createNeedsName") });
+					return;
+				}
 				setBusy(true);
 				try {
 					await post("/new", { name: n });
@@ -412,11 +419,16 @@ window.__ModuleLoader__.load({
 				try {
 					const conn = ctx.get("connection");
 					if (conn && conn.api && conn.api.settings) {
-						conn.api.settings.openDocument({}).catch(() => {});
+						conn.api.settings.openDocument({}).catch((e) => {
+							window.alert(t("openSettingsFailed", { error: e && e.message ? e.message : String(e) }));
+						});
+						return;
 					}
-				} catch {
-					/* fall back to manual navigation */
+				} catch (e) {
+					window.alert(t("openSettingsFailed", { error: e && e.message ? e.message : String(e) }));
+					return;
 				}
+				window.alert(t("openSettingsFailed", { error: "connection unavailable" }));
 			};
 
 			const switchTo = async (name) => {
