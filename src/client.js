@@ -446,8 +446,8 @@ window.__ModuleLoader__.load({
 			};
 
 			const face = {
-				width: wide ? 24 : 20,
-				height: wide ? 24 : 20,
+				width: 24,
+				height: 24,
 				borderRadius: "50%",
 				objectFit: "cover",
 				background: "#eef1f5",
@@ -467,8 +467,9 @@ window.__ModuleLoader__.load({
 					gap: 8,
 					width: "100%",
 					boxSizing: "border-box",
-					padding: wide ? "6px 8px" : "4px 0",
+					padding: wide ? "7px 10px" : "6px 0",
 					border: 0,
+					borderRadius: 8,
 					background: "none",
 					cursor: "pointer",
 					color: "#1c2024",
@@ -503,7 +504,9 @@ window.__ModuleLoader__.load({
 					color: "#1c2024"
 				}
 			},
-				react.createElement("div", { style: { fontWeight: 600, marginBottom: 6 } }, t("subtitle")),
+				react.createElement("div", { style: { fontWeight: 600, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 } },
+					react.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+						soul ? t("badgeTitle", { name: soul.name }) : t("badgeNoSoul"))),
 				souls !== null && souls.length === 0 &&
 					react.createElement("div", { style: { color: "#8a94a3" } }, t("noSouls")),
 				souls !== null && souls.map((x) => {
