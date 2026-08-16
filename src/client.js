@@ -395,6 +395,18 @@ window.__ModuleLoader__.load({
 			};
 			react.useEffect(() => { refresh(); const iv = setInterval(refresh, 30000); return () => clearInterval(iv); }, []);
 
+			const post = async (path, payload) => {
+				const res = await fetch(API + path, {
+					method: "POST",
+					credentials: "same-origin",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify(payload)
+				});
+				const data = await res.json().catch(() => ({}));
+				if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+				return data;
+			};
+
 			const openSettings = () => {
 				setOpen(false);
 				try {
