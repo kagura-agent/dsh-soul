@@ -1,0 +1,23 @@
+{
+  "name": "dsh-persona",
+  "version": "0.1.0",
+  "description": "DSH plugin: manage agent personalities — store persona packs (SOUL/IDENTITY/USER/AGENTS/MEMORY) separately, activate one to aggregate it into the global instruction layer ~/.dsh/AGENTS.md.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./src/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": ["slots", "locale"],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "license": "MIT"
+}
