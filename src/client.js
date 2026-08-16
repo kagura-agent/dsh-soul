@@ -445,7 +445,13 @@ window.__ModuleLoader__.load({
 							react.createElement("p", { style: styles.muted }, t("noSouls")),
 						souls !== null && souls.map((s) =>
 							react.createElement("div", { key: s.name, style: styles.soul },
-								react.createElement(AvatarImg, { soul: s }),
+								react.createElement("button", {
+									type: "button",
+									style: { padding: 0, border: 0, background: "none", cursor: "pointer", borderRadius: "50%", flex: "none", lineHeight: 0 },
+									onClick: () => pickAvatar(s.name),
+									disabled: busy,
+									title: t("uploadAvatar")
+								}, react.createElement(AvatarImg, { soul: s })),
 								react.createElement("div", { style: { flex: 1, minWidth: 0 } },
 									react.createElement("div", { style: { fontWeight: 600, color: "#1c2024" } },
 										s.name + (s.active ? ` ${t("activeBadge")}` : "")),
@@ -454,7 +460,6 @@ window.__ModuleLoader__.load({
 										(s.beliefsBytes > 0 ? ` · ${t("beliefsLabel")}: ${s.beliefsBytes}B` : "") +
 										` · ${t("notesLabel")}: ${s.notes}`)),
 								react.createElement("button", { style: styles.btn, onClick: () => openEditor(s.name, "SOUL.md"), disabled: busy }, t("edit")),
-								react.createElement("button", { style: styles.btn, onClick: () => pickAvatar(s.name), disabled: busy, title: t("uploadAvatar") }, "🖼️"),
 								!s.active &&
 									react.createElement("button", { style: styles.btnPrimary, onClick: () => runActivate(s.name), disabled: busy }, t("activate")),
 								!s.active &&
