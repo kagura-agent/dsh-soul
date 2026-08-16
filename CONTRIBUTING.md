@@ -21,7 +21,8 @@ Thanks for considering a contribution! Small, focused plugin — the bar is:
 
 ```sh
 node --check src/index.js && node --check src/client.js
-node .selftest-e2e.mjs   # 23 route-level integration cases
+node .selftest-client.mjs  # client static checks (i18n keys, helper references)
+node .selftest-e2e.mjs    # 23 route-level integration cases
 ```
 
 The suite must pass before a PR is ready.

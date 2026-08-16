@@ -67,7 +67,8 @@ dsh plugin --profile web add /path/to/dsh-soul
 
 ```sh
 node --check src/index.js && node --check src/client.js
-node .selftest-e2e.mjs   # 23 项路由级集成测试（假 HOME）
+node .selftest-client.mjs  # client 静态检查（i18n key、内部引用完整性）
+node .selftest-e2e.mjs    # 23 项路由级集成测试（假 HOME）
 ```
 
 ## License

@@ -67,7 +67,8 @@ Config changes apply live via HMR.
 
 ```sh
 node --check src/index.js && node --check src/client.js
-node .selftest-e2e.mjs   # 23 route-level integration cases (fake $HOME)
+node .selftest-client.mjs  # client static checks (i18n keys, helper references)
+node .selftest-e2e.mjs    # 23 route-level integration cases (fake $HOME)
 ```
 
 ## License

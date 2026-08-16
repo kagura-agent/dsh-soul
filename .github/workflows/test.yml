@@ -17,5 +17,7 @@ jobs:
         run: |
           node --check src/index.js
           node --check src/client.js
+      - name: Client static consistency (i18n keys + helper references)
+        run: node .selftest-client.mjs
       - name: Host route integration tests
         run: node .selftest-e2e.mjs
