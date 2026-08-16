@@ -13,7 +13,7 @@ window.__ModuleLoader__.load({
 		var react = require("react");
 
 		const name = "dsh-soul-client";
-		const inject = ["slots", "locale"];
+		const inject = ["slots", "locale", "connection"];
 
 		const API = "/api/dsh-soul";
 		const NS = "dsh-soul";
@@ -47,6 +47,7 @@ window.__ModuleLoader__.load({
 			syncHint: "DNA 修改后自动重新聚合到 ~/.dsh/AGENTS.md（下次访问时生效）",
 			badgeNoSoul: "未激活灵魂",
 			badgeTitle: "当前灵魂：{name}",
+			newSoulEntry: "新建灵魂…",
 		};
 		const en = {
 			subtitle: "Raise an evolving AI companion: soul DNA + experiences + growth",
@@ -78,6 +79,7 @@ window.__ModuleLoader__.load({
 			syncHint: "DNA edits re-aggregate into ~/.dsh/AGENTS.md automatically (on next visit)",
 			badgeNoSoul: "No soul active",
 			badgeTitle: "Active soul: {name}",
+			newSoulEntry: "New soul…",
 		};
 
 		const styles = {
@@ -203,7 +205,6 @@ window.__ModuleLoader__.load({
 			const [busy, setBusy] = react.useState(false);
 			const [souls, setSouls] = react.useState(null);
 			const [active, setActive] = react.useState(null);
-			const [newName, setNewName] = react.useState("");
 			const [result, setResult] = react.useState(null);
 			const fileRef = react.useRef(null);
 			const uploadFor = react.useRef(null);
@@ -211,18 +212,6 @@ window.__ModuleLoader__.load({
 			const t = ctx.locale.bind(NS);
 			const [, forceRender] = react.useReducer((x) => x + 1, 0);
 			react.useEffect(() => ctx.locale.subscribe(() => forceRender()), [ctx]);
-
-			const post = async (path, payload) => {
-				const res = await fetch(API + path, {
-					method: "POST",
-					credentials: "same-origin",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify(payload)
-				});
-				const data = await res.json().catch(() => ({}));
-				if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
-				return data;
-			};
 
 			const load = async () => {
 				try {
@@ -375,22 +364,9 @@ window.__ModuleLoader__.load({
 			const [avatarSrc, setAvatarSrc] = react.useState(null);
 			const [open, setOpen] = react.useState(false);
 			const [busy, setBusy] = react.useState(false);
-			const [newName, setNewName] = react.useState("");
 			const t = ctx.locale.bind(NS);
 			const [, forceRender] = react.useReducer((x) => x + 1, 0);
 			react.useEffect(() => ctx.locale.subscribe(() => forceRender()), [ctx]);
-
-			const post = async (path, payload) => {
-				const res = await fetch(API + path, {
-					method: "POST",
-					credentials: "same-origin",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify(payload)
-				});
-				const data = await res.json().catch(() => ({}));
-				if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
-				return data;
-			};
 
 			const refresh = () => {
 				fetch(API + "/list", {
@@ -419,26 +395,24 @@ window.__ModuleLoader__.load({
 			};
 			react.useEffect(() => { refresh(); const iv = setInterval(refresh, 30000); return () => clearInterval(iv); }, []);
 
+			const openSettings = () => {
+				setOpen(false);
+				try {
+					const conn = ctx.get("connection");
+					if (conn && conn.api && conn.api.settings) {
+						conn.api.settings.openDocument({}).catch(() => {});
+					}
+				} catch {
+					/* fall back to manual navigation */
+				}
+			};
+
 			const switchTo = async (name) => {
 				setBusy(true);
 				try {
 					await post("/activate", { name });
 					setOpen(false);
 					refresh();
-				} catch (e) {
-					window.alert(e.message);
-				}
-				setBusy(false);
-			};
-
-			const createSoul = async () => {
-				const n = newName.trim();
-				if (!n) return;
-				setBusy(true);
-				try {
-					await post("/new", { name: n });
-					setNewName("");
-					await switchTo(n);
 				} catch (e) {
 					window.alert(e.message);
 				}
@@ -534,20 +508,25 @@ window.__ModuleLoader__.load({
 							x.name + (x.active ? " ✓" : "")));
 					return react.createElement("div", { key: x.name, style: { display: "flex", alignItems: "center", gap: 8 } }, rowBtn);
 				}),
-				react.createElement("div", { style: { display: "flex", gap: 6, marginTop: 8, paddingTop: 8, borderTop: "1px solid #eef1f5" } },
-					react.createElement("input", {
-						style: { flex: 1, minWidth: 0, boxSizing: "border-box", padding: "6px 8px", border: "1px solid #d4d9e0", borderRadius: 8, fontSize: 12, outline: "none" },
-						value: newName,
-						placeholder: t("newPlaceholder"),
-						onChange: (e) => setNewName(e.target.value),
-						onKeyDown: (e) => { if (e.key === "Enter") void createSoul(); }
-					}),
+				react.createElement("div", { style: { marginTop: 8, paddingTop: 8, borderTop: "1px solid #eef1f5" } },
 					react.createElement("button", {
 						type: "button",
-						style: { padding: "6px 10px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" },
-						onClick: createSoul,
-						disabled: busy
-					}, t("create"))));
+						style: {
+							display: "flex",
+							alignItems: "center",
+							gap: 8,
+							width: "100%",
+							padding: "6px 8px",
+							border: 0,
+							borderRadius: 8,
+							background: "none",
+							cursor: "pointer",
+							font: "inherit",
+							color: "#1c2024",
+							textAlign: "left"
+						},
+						onClick: openSettings
+					}, t("newSoulEntry"))));
 
 			const overlay = react.createElement("div", {
 				style: { position: "fixed", inset: 0, zIndex: 999, background: "transparent" },
