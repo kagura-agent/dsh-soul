@@ -723,12 +723,15 @@ window.__ModuleLoader__.load({
 				// --- monthly activity chart --------------------------------------
 				...(monthly.length > 0
 					? [sectionTitle(t("growthActivity")),
-						react.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 3, height: 104, padding: "10px 12px", border: "1px solid #e4e8ee", borderRadius: 10, background: "#fff", overflowX: "auto" } },
-							monthly.map((x) =>
-								react.createElement("div", { key: x.month, title: x.month + " · " + x.count, style: { flex: "1 0 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 14 } },
-									react.createElement("span", { style: { fontSize: 9, color: "#8a94a3", fontVariantNumeric: "tabular-nums" } }, x.count),
-									react.createElement("div", { style: { width: "100%", maxWidth: 18, height: Math.max(2, Math.round((x.count / maxCount) * 56)), borderRadius: "3px 3px 0 0", background: x.month >= (new Date().toISOString().slice(0, 7)) ? "#1f6feb" : "#9db9e8" } }),
-									react.createElement("span", { style: { fontSize: 9, color: "#8a94a3", whiteSpace: "nowrap" } }, x.month.slice(2)))))]
+						react.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 6, height: 130, padding: "12px 14px", border: "1px solid #e4e8ee", borderRadius: 10, background: "#fff", overflowX: "auto" } },
+							monthly.map((x) => {
+								const barH = Math.max(4, Math.round((x.count / maxCount) * 84));
+								const isCurrent = x.month >= (new Date().toISOString().slice(0, 7));
+								return react.createElement("div", { key: x.month, title: x.month + " · " + x.count + " 篇", style: { flex: "0 0 30px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 4, height: "100%" } },
+									react.createElement("span", { style: { fontSize: 10, color: "#1c2024", fontWeight: 600, fontVariantNumeric: "tabular-nums" } }, x.count),
+									react.createElement("div", { style: { width: 22, height: barH, borderRadius: "4px 4px 0 0", background: isCurrent ? "#1f6feb" : "#7ba7e8", boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)" } }),
+									react.createElement("span", { style: { fontSize: 9.5, color: "#8a94a3", whiteSpace: "nowrap" } }, x.month.slice(2)));
+							}))]
 					: []),
 				// --- timeline -----------------------------------------------------
 				sectionTitle(t("growthTimeline")),
