@@ -139,6 +139,17 @@ const agentsPath = join(fakeHome, ".dsh", "AGENTS.md");
   check(r5.body.content.includes("Edited."), "get: reflects saved edit");
 }
 
+// --- 6c. growth record --------------------------------------------------------
+{
+  const r = await call("/api/dsh-soul/growth", { name: "kagura" });
+  check(r.status === 200 && r.body.ok, "growth: 200");
+  check(Array.isArray(r.body.manifest.activations) && r.body.manifest.activations.length >= 1, "growth: activations present");
+  check(Array.isArray(r.body.manifest.dnaChanges), "growth: dnaChanges array present");
+  check(typeof r.body.beliefsCount === "number", "growth: beliefsCount is a number");
+  check(Array.isArray(r.body.notes), "growth: notes array present");
+  check((await call("/api/dsh-soul/growth", { name: "nope" })).status === 400, "growth: unknown soul rejected");
+}
+
 // --- 7. delete rules ----------------------------------------------------------
 {
   check((await call("/api/dsh-soul/delete", { name: "kagura" })).status === 400, "delete: active soul rejected");

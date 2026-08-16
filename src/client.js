@@ -53,6 +53,20 @@ window.__ModuleLoader__.load({
 			newSoul: "新建灵魂",
 			createNamePlaceholder: "灵魂名字（如 kagura）",
 			close: "关闭",
+			tabConfig: "配置",
+			tabGrowth: "成长",
+			growthBorn: "出生于 {ts}",
+			growthWakeups: "醒来 {n} 次",
+			growthDnaChanges: "DNA 修改 {n} 次",
+			growthBeliefs: "候选教训 {n} 条",
+			growthNotes: "日记 {n} 篇",
+			growthTimeline: "成长时间线",
+			growthEventWake: "醒来（第 {n} 次）",
+			growthEventDna: "修改了 {file}",
+			growthEventBelief: "新增候选教训",
+			growthEventNote: "日记",
+			growthEventBorn: "出生",
+			growthNoEvents: "还没有成长记录",
 			save: "保存",
 			editingHint: "保存后自动重新聚合到 ~/.dsh/AGENTS.md",
 			saved: "已保存 {file}",
@@ -98,6 +112,20 @@ window.__ModuleLoader__.load({
 			newSoul: "New soul",
 			createNamePlaceholder: "Soul name (e.g. kagura)",
 			close: "Close",
+			tabConfig: "Config",
+			tabGrowth: "Growth",
+			growthBorn: "Born {ts}",
+			growthWakeups: "woken {n} times",
+			growthDnaChanges: "{n} DNA edits",
+			growthBeliefs: "{n} belief candidates",
+			growthNotes: "{n} notes",
+			growthTimeline: "Growth timeline",
+			growthEventWake: "Woke up (#{n})",
+			growthEventDna: "Edited {file}",
+			growthEventBelief: "New belief candidate",
+			growthEventNote: "Note",
+			growthEventBorn: "Born",
+			growthNoEvents: "No growth yet",
 			save: "Save",
 			editingHint: "Saving re-aggregates into ~/.dsh/AGENTS.md automatically",
 			saved: "Saved {file}",
@@ -629,6 +657,44 @@ window.__ModuleLoader__.load({
 					react.createElement("span", { style: { color: "#8a94a3", fontSize: 12 } }, t("editingHint"))));
 		}
 
+		/** Growth view: the soul's life — born/wakeups/DNA edits timeline. */
+		function GrowthView({ data, t }) {
+			if (data === null) {
+				return react.createElement("div", { style: { color: "#8a94a3", fontSize: 12 } }, t("busy"));
+			}
+			const m = data.manifest || {};
+			const events = [];
+			if (m.createdAt) events.push({ ts: m.createdAt, kind: "born" });
+			(m.activations || []).forEach((ts, i) => events.push({ ts, kind: "wake", n: i + 1 }));
+			(m.dnaChanges || []).forEach((c) => events.push({ ts: c.ts, kind: "dna", file: c.file }));
+			(data.beliefsRecent || []).forEach((b) => events.push({ ts: null, kind: "belief", text: b }));
+			(data.notes || []).forEach((n) => events.push({ ts: null, kind: "note", text: n }));
+			events.sort((a, b) => (b.ts || "").localeCompare(a.ts || ""));
+
+			const chip = (label) => react.createElement("span", { style: { fontSize: 12, color: "#5a6472" } }, label);
+			return react.createElement("div", { style: { flex: 1, minHeight: 0, padding: "12px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 } },
+				react.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", padding: "10px 12px", border: "1px solid #e4e8ee", borderRadius: 10, background: "#fafbfc" } },
+					chip(t("growthBorn", { ts: (m.createdAt || "").slice(0, 10) || "?" })),
+					chip(t("growthWakeups", { n: (m.activations || []).length })),
+					chip(t("growthDnaChanges", { n: (m.dnaChanges || []).length })),
+					chip(t("growthBeliefs", { n: data.beliefsCount || 0 })),
+					chip(t("growthNotes", { n: (data.notes || []).length }))),
+				react.createElement("div", { style: { fontWeight: 600, color: "#1c2024" } }, t("growthTimeline")),
+				events.length === 0
+					? react.createElement("div", { style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoEvents"))
+					: react.createElement("div", { style: { display: "flex", flexDirection: "column" } },
+						events.map((ev, i) => {
+							const label = ev.kind === "born" ? "🎂 " + t("growthEventBorn")
+								: ev.kind === "wake" ? "🌅 " + t("growthEventWake", { n: ev.n })
+								: ev.kind === "dna" ? "✏️ " + t("growthEventDna", { file: ev.file })
+								: ev.kind === "belief" ? "💡 " + t("growthEventBelief") + "：" + ev.text
+								: "📓 " + t("growthEventNote") + "：" + ev.text;
+							return react.createElement("div", { key: i, style: { display: "flex", gap: 8, padding: "4px 0", borderBottom: "1px solid #f1f3f6" } },
+								react.createElement("span", { style: { flex: "none", width: 132, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 1 } }, ev.ts ? ev.ts.replace("T", " ").slice(0, 16) : "—"),
+								react.createElement("span", { style: { fontSize: 12, color: "#1c2024", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, label));
+						})));
+		}
+
 		/** Large soul-config modal: the soul list on the left (each row with an
 		 * Activate button), the selected soul's full config on the right. One
 		 * entry point from the sidebar — no intermediate switcher menu. */
@@ -642,6 +708,8 @@ window.__ModuleLoader__.load({
 			const [loading, setLoading] = react.useState(true);
 			const [creating, setCreating] = react.useState(false);
 			const [newName, setNewName] = react.useState("");
+			const [tab, setTab] = react.useState("config");
+			const [growthData, setGrowthData] = react.useState(null);
 			const fileRef = react.useRef(null);
 			const t = ctx.locale.bind(NS);
 			const [, forceRender] = react.useReducer((x) => x + 1, 0);
@@ -682,7 +750,12 @@ window.__ModuleLoader__.load({
 				setLoading(false);
 			};
 
-			const selectSoul = (name) => { void loadFile(name, "SOUL.md"); };
+			const selectSoul = (name) => {
+				void loadFile(name, "SOUL.md");
+				if (tab === "growth") {
+					void post("/growth", { name }).then(setGrowthData).catch(() => { /* keep previous */ });
+				}
+			};
 
 			const saveFile = async () => {
 				setBusy(true);
@@ -797,6 +870,17 @@ window.__ModuleLoader__.load({
 				cursor: "pointer",
 				font: "inherit"
 			});
+			const mainTab = (k) => ({
+				padding: "6px 12px",
+				border: k === tab ? "1px solid #1f6feb" : "1px solid #d4d9e0",
+				borderRadius: 7,
+				background: k === tab ? "#e8f0fe" : "#f6f8fa",
+				color: "#1c2024",
+				fontSize: 12,
+				fontWeight: k === tab ? 600 : 400,
+				cursor: "pointer",
+				font: "inherit"
+			});
 			const body = { flex: 1, minHeight: 0, padding: "10px 18px 14px", display: "flex", flexDirection: "column" };
 			const ta = {
 				flex: 1,
@@ -879,9 +963,19 @@ window.__ModuleLoader__.load({
 								onClick: onClose
 							}, "✕")),
 						react.createElement("div", { style: tabs },
+							["config", "growth"].map((k) =>
+								react.createElement("button", { key: k, type: "button", style: mainTab(k), onClick: () => {
+									if (k === "growth") {
+										setTab("growth");
+										void post("/growth", { name: current }).then(setGrowthData).catch(() => { /* keep previous */ });
+									} else {
+										setTab("config");
+									}
+								}, disabled: busy || loading }, t(k === "config" ? "tabConfig" : "tabGrowth")))),
+						tab === "config" && react.createElement("div", { style: tabs },
 							files.map((f) =>
 								react.createElement("button", { key: f, type: "button", style: tabStyle(f), onClick: () => loadFile(current, f), disabled: busy || loading }, f.replace(/\.md$/i, "")))),
-						react.createElement("div", { style: body },
+						tab === "config" && react.createElement("div", { style: body },
 							react.createElement("textarea", {
 								style: ta,
 								value: loading ? "" : content,
@@ -889,9 +983,10 @@ window.__ModuleLoader__.load({
 								disabled: loading || busy,
 								onChange: (e) => setContent(e.target.value)
 							})),
-						react.createElement("div", { style: footer },
+						tab === "config" && react.createElement("div", { style: footer },
 							react.createElement("button", { type: "button", style: { padding: "7px 16px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: saveFile, disabled: busy || loading }, t("save")),
-							react.createElement("span", { style: { fontSize: 12, color: "#8a94a3" } }, t("editingHint"))))));
+							react.createElement("span", { style: { fontSize: 12, color: "#8a94a3" } }, t("editingHint"))),
+						tab === "growth" && react.createElement(GrowthView, { data: growthData, t }))));
 		}
 
 		/** Error boundary: a crash in the card or badge shows the error text

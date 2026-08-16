@@ -331,6 +331,7 @@ function apply(ctx, config) {
     { path: `${API_PREFIX}/activate`, handler: activate },
     { path: `${API_PREFIX}/save`, handler: save },
     { path: `${API_PREFIX}/get`, handler: getFile },
+    { path: `${API_PREFIX}/growth`, handler: growth },
     { path: `${API_PREFIX}/delete`, handler: removeSoul },
     { path: `${API_PREFIX}/sync`, handler: sync },
     { path: `${API_PREFIX}/avatar`, handler: avatar },
@@ -480,6 +481,45 @@ function apply(ctx, config) {
     }
     // Lazy re-aggregation covers the active soul on the next list/status.
     sendJson(res, 200, { ok: true, soul: readSoul(root, dir, activeSoulName()) });
+  }
+
+  /** Growth record for a soul: manifest (activations, DNA changes) plus
+   * counts and recent daily-note names — what the '成长' view renders. */
+  async function growth(ctx, req, res) {
+    const body = await readJsonBody(req).catch(() => null);
+    const soulName = safeName(body !== null && typeof body.name === "string" ? body.name : "");
+    const dir = soulDir(soulsRoot(), soulName);
+    if (dir === null || !existsSync(dir)) {
+      sendJson(res, 400, { ok: false, error: `soul "${soulName}" not found` });
+      return;
+    }
+    const manifest = readManifest(dir) || { name: soulName, createdAt: null, activations: [], dnaChanges: [], migrations: [] };
+    // beliefs: count dated candidate entries (rough: lines containing a date)
+    let beliefsCount = 0;
+    let beliefsRecent = [];
+    try {
+      const bp = join(dir, "beliefs", "candidates.md");
+      if (existsSync(bp)) {
+        const text = readFileSync(bp, "utf8");
+        const lines = text.split("\n");
+        beliefsCount = lines.filter((l) => /\d{4}-\d{2}-\d{2}/.test(l)).length;
+        // last few candidate bullets
+        beliefsRecent = lines.filter((l) => /^\s*-/.test(l)).slice(-5).map((l) => l.replace(/^\s*-\s*/, "").slice(0, 120));
+      }
+    } catch { /* ignore */ }
+    // recent daily notes (newest filenames)
+    let notes = [];
+    try {
+      const mp = join(dir, "memory");
+      if (existsSync(mp)) {
+        notes = readdirSync(mp)
+          .filter((n) => n.endsWith(".md"))
+          .sort()
+          .slice(-5)
+          .reverse();
+      }
+    } catch { /* ignore */ }
+    sendJson(res, 200, { ok: true, name: soulName, manifest, beliefsCount, beliefsRecent, notes });
   }
 
   /** Read one DNA / beliefs file of a soul (for the editor UI). */
