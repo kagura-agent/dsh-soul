@@ -580,6 +580,39 @@ window.__ModuleLoader__.load({
 			return react.createElement("div", { style }, "🌸");
 		}
 
+		/** Error boundary: a crash in the card or badge shows the error text
+		 * instead of unmounting the whole settings page silently. */
+		class Boundary extends react.Component {
+			constructor(props) {
+				super(props);
+				this.state = { error: null };
+			}
+			static getDerivedStateFromError(error) {
+				return { error };
+			}
+			componentDidCatch(error) {
+				console.error("dsh-soul boundary:", error);
+			}
+			render() {
+				if (this.state.error !== null) {
+					return react.createElement("div", {
+						style: {
+							border: "1px solid #e0b4b0",
+							borderRadius: 8,
+							background: "#fdf3f2",
+							color: "#c0392b",
+							padding: "8px 10px",
+							margin: "6px 0",
+							fontSize: 12,
+							whiteSpace: "pre-wrap",
+							wordBreak: "break-word"
+						}
+					}, `dsh-soul error: ${this.state.error.message}\n${this.state.error.stack || ""}`);
+				}
+				return this.props.children;
+			}
+		}
+
 		function apply(ctx) {
 			const slots = ctx.get("slots");
 			if (slots === void 0) return;
@@ -589,12 +622,12 @@ window.__ModuleLoader__.load({
 			}
 			slots.inject("settings.plugin.item", () => slots.register(
 				{ name: "settings.plugin.item", id: "dsh-soul", order: 45, label: "dsh-soul" },
-				() => react.createElement(SoulCard, { ctx })
+				() => react.createElement(Boundary, null, react.createElement(SoulCard, { ctx }))
 			));
 			// The active soul's face, always visible at the sidebar footer.
 			slots.inject("sidebar.footer.action", () => slots.register(
 				{ name: "sidebar.footer.action", id: "dsh-soul-active", order: 10, label: "dsh-soul" },
-				({ wide }) => react.createElement(ActiveSoulBadge, { ctx, wide })
+				({ wide }) => react.createElement(Boundary, null, react.createElement(ActiveSoulBadge, { ctx, wide }))
 			));
 		}
 
