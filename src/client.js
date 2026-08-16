@@ -868,11 +868,16 @@ window.__ModuleLoader__.load({
 					react.createElement("div", { style: detail },
 						react.createElement("div", { style: header },
 							react.createElement("button", { type: "button", style: { padding: 0, border: 0, background: "none", cursor: "pointer", borderRadius: "50%", lineHeight: 0 }, onClick: pickAvatar, title: t("uploadAvatar") },
-								react.createElement(SoulFace, { soul: { name: current, avatar: null } })),
+								react.createElement(SoulFace, { soul: (souls !== null && souls.find((x) => x.name === current)) || { name: current, avatar: null } })),
 							react.createElement("div", { style: { flex: 1, minWidth: 0 } },
 								react.createElement("div", { style: { fontWeight: 600, fontSize: 15 } }, current),
 								react.createElement("div", { style: { fontSize: 12, color: "#8a94a3" } }, active === current ? t("activeBadge") : t("detailTitle"))),
-							react.createElement("button", { type: "button", style: { padding: "6px 10px", border: "1px solid #c9d1dc", borderRadius: 8, background: "#f6f8fa", color: "#1c2024", fontSize: 12, cursor: "pointer", font: "inherit" }, onClick: onClose }, t("close"))),
+							react.createElement("button", {
+								type: "button",
+								style: { width: 28, height: 28, border: 0, borderRadius: 8, background: "none", cursor: "pointer", color: "#1c2024", fontSize: 15, lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", font: "inherit" },
+								"aria-label": t("close"),
+								onClick: onClose
+							}, "✕")),
 						react.createElement("div", { style: tabs },
 							files.map((f) =>
 								react.createElement("button", { key: f, type: "button", style: tabStyle(f), onClick: () => loadFile(current, f), disabled: busy || loading }, f.replace(/\.md$/i, "")))),
