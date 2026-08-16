@@ -629,111 +629,6 @@ window.__ModuleLoader__.load({
 					react.createElement("span", { style: { color: "#8a94a3", fontSize: 12 } }, t("editingHint"))));
 		}
 
-		/** Sidebar footer entry: create a soul, then open its config modal. */
-		function NewSoulButton({ ctx, wide }) {
-			const [openInput, setOpenInput] = react.useState(false);
-			const [name, setName] = react.useState("");
-			const [busy, setBusy] = react.useState(false);
-			const [detail, setDetail] = react.useState(null); // newly created soul
-			const t = ctx.locale.bind(NS);
-			const [, forceRender] = react.useReducer((x) => x + 1, 0);
-			react.useEffect(() => ctx.locale.subscribe(() => forceRender()), [ctx]);
-
-			const createSoul = async () => {
-				const n = name.trim();
-				if (!n) {
-					window.alert(t("createNeedsName"));
-					return;
-				}
-				setBusy(true);
-				try {
-					const res = await fetch(API + "/new", {
-						method: "POST",
-						credentials: "same-origin",
-						headers: { "content-type": "application/json" },
-						body: JSON.stringify({ name: n })
-					});
-					const data = await res.json().catch(() => ({}));
-					if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
-					setOpenInput(false);
-					setName("");
-					setDetail(n);
-				} catch (e) {
-					window.alert(e.message);
-				}
-				setBusy(false);
-			};
-
-			const btnStyle = wide ? {
-				boxSizing: "border-box",
-				display: "flex",
-				alignItems: "center",
-				gap: 8,
-				width: "calc(100% + 8px)",
-				height: 34,
-				margin: "4px -4px",
-				padding: "6px 2px 6px 10px",
-				border: 0,
-				borderRadius: 12,
-				background: "none",
-				cursor: "pointer",
-				color: "#5a6472",
-				font: "inherit",
-				fontSize: 14,
-				lineHeight: 22,
-				textAlign: "left"
-			} : {
-				boxSizing: "border-box",
-				display: "flex",
-				alignItems: "center",
-				justifyContent: "center",
-				width: 36,
-				height: 36,
-				margin: "8px 0 10px",
-				padding: 0,
-				border: 0,
-				borderRadius: "50%",
-				background: "none",
-				cursor: "pointer",
-				color: "#5a6472",
-				fontSize: 18
-			};
-
-			const inputLayer = react.createElement("div", {
-				style: { position: "fixed", bottom: 60, left: 8, zIndex: 1001, width: "min(260px, calc(100vw - 16px))", background: "#fff", border: "1px solid #d4d9e0", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.18)", padding: "8px", display: "flex", gap: 6 }
-			},
-				react.createElement("input", {
-					style: { flex: 1, minWidth: 0, boxSizing: "border-box", padding: "5px 8px", border: "1px solid #d4d9e0", borderRadius: 6, fontSize: 12, outline: "none", font: "inherit" },
-					value: name,
-					placeholder: t("createNamePlaceholder"),
-					autoFocus: true,
-					onChange: (e) => setName(e.target.value),
-					onKeyDown: (e) => { if (e.key === "Enter") void createSoul(); if (e.key === "Escape") setOpenInput(false); }
-				}),
-				react.createElement("button", {
-					type: "button",
-					style: { padding: "5px 10px", border: 0, borderRadius: 6, background: "#1f6feb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", font: "inherit" },
-					onClick: createSoul,
-					disabled: busy
-				}, t("create")));
-
-			return react.createElement(react.Fragment, null,
-				react.createElement("button", {
-					type: "button",
-					style: btnStyle,
-					title: t("newSoul"),
-					onClick: () => setOpenInput(!openInput)
-				},
-					wide
-						? react.createElement("span", { style: { fontSize: 14 } }, "＋ " + t("newSoul"))
-						: react.createElement("span", { style: { fontSize: 16 } }, "＋")),
-				openInput && react.createElement(react.Fragment, null,
-					react.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 1000, background: "transparent" }, onClick: () => setOpenInput(false) }),
-					inputLayer),
-				detail !== null &&
-					react.createElement(SoulDetailModal, { ctx, initialName: detail, onClose: () => setDetail(null) }));
-		}
-
 		/** Large soul-config modal: the soul list on the left (each row with an
 		 * Activate button), the selected soul's full config on the right. One
 		 * entry point from the sidebar — no intermediate switcher menu. */
@@ -745,6 +640,8 @@ window.__ModuleLoader__.load({
 			const [file, setFile] = react.useState("SOUL.md");
 			const [content, setContent] = react.useState("");
 			const [loading, setLoading] = react.useState(true);
+			const [creating, setCreating] = react.useState(false);
+			const [newName, setNewName] = react.useState("");
 			const fileRef = react.useRef(null);
 			const t = ctx.locale.bind(NS);
 			const [, forceRender] = react.useReducer((x) => x + 1, 0);
@@ -803,6 +700,25 @@ window.__ModuleLoader__.load({
 				try {
 					await post("/activate", { name });
 					await refreshList();
+				} catch (e) {
+					window.alert(e.message);
+				}
+				setBusy(false);
+			};
+
+			const createSoul = async () => {
+				const n = newName.trim();
+				if (!n) {
+					window.alert(t("createNeedsName"));
+					return;
+				}
+				setBusy(true);
+				try {
+					await post("/new", { name: n });
+					setNewName("");
+					setCreating(false);
+					await refreshList();
+					await loadFile(n, "SOUL.md");
 				} catch (e) {
 					window.alert(e.message);
 				}
@@ -925,7 +841,30 @@ window.__ModuleLoader__.load({
 								}, t("activate"))
 								: null;
 							return react.createElement("div", { key: x.name, style: { display: "flex", alignItems: "center", gap: 4 } }, rowBtn, actBtn);
-						})),
+						}),
+						react.createElement("div", { style: { marginTop: 6, paddingTop: 6, borderTop: "1px solid #e4e8ee" } },
+							!creating
+								? react.createElement("button", {
+									type: "button",
+									style: { ...sideRow(false), color: "#1f6feb", fontWeight: 500 },
+									onClick: () => setCreating(true),
+									disabled: busy
+								}, "＋ " + t("newSoul"))
+								: react.createElement("div", { style: { display: "flex", gap: 4 } },
+									react.createElement("input", {
+										style: { flex: 1, minWidth: 0, boxSizing: "border-box", padding: "5px 8px", border: "1px solid #d4d9e0", borderRadius: 6, fontSize: 12, outline: "none", font: "inherit" },
+										value: newName,
+										placeholder: t("createNamePlaceholder"),
+										autoFocus: true,
+										onChange: (e) => setNewName(e.target.value),
+										onKeyDown: (e) => { if (e.key === "Enter") void createSoul(); if (e.key === "Escape") setCreating(false); }
+									}),
+									react.createElement("button", {
+										type: "button",
+										style: { padding: "5px 9px", border: 0, borderRadius: 6, background: "#1f6feb", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", font: "inherit" },
+										onClick: createSoul,
+										disabled: busy
+									}, t("create"))))),
 					react.createElement("div", { style: detail },
 						react.createElement("div", { style: header },
 							react.createElement("button", { type: "button", style: { padding: 0, border: 0, background: "none", cursor: "pointer", borderRadius: "50%", lineHeight: 0 }, onClick: pickAvatar, title: t("uploadAvatar") },
@@ -999,10 +938,7 @@ window.__ModuleLoader__.load({
 				{ name: "sidebar.footer.action", id: "dsh-soul-active", order: 10, label: "dsh-soul" },
 				({ wide }) => react.createElement(Boundary, null, react.createElement(ActiveSoulBadge, { ctx, wide }))
 			));
-			slots.inject("sidebar.footer.action", () => slots.register(
-				{ name: "sidebar.footer.action", id: "dsh-soul-new", order: 20, label: "dsh-soul" },
-				({ wide }) => react.createElement(Boundary, null, react.createElement(NewSoulButton, { ctx, wide }))
-			));
+
 		}
 
 		exports.name = name;
