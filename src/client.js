@@ -61,6 +61,7 @@ window.__ModuleLoader__.load({
 			badgeNoSoul: "未激活灵魂",
 			badgeTitle: "当前灵魂：{name}",
 			newSoulEntry: "新建灵魂…",
+			cancel: "取消",
 			createNeedsName: "先输入一个名字",
 			openSettingsFailed: "无法打开设置：{error}",
 		};
@@ -95,6 +96,7 @@ window.__ModuleLoader__.load({
 			badgeNoSoul: "No soul active",
 			badgeTitle: "Active soul: {name}",
 			newSoulEntry: "New soul…",
+			cancel: "Cancel",
 			createNeedsName: "Enter a name first",
 			openSettingsFailed: "Could not open settings: {error}",
 		};
@@ -384,6 +386,8 @@ window.__ModuleLoader__.load({
 			const [souls, setSouls] = react.useState(null);
 			const [avatarSrc, setAvatarSrc] = react.useState(null);
 			const [open, setOpen] = react.useState(false);
+			const [creating, setCreating] = react.useState(false);
+			const [newName, setNewName] = react.useState("");
 			const [busy, setBusy] = react.useState(false);
 			const t = ctx.locale.bind(NS);
 			const [, forceRender] = react.useReducer((x) => x + 1, 0);
@@ -416,21 +420,20 @@ window.__ModuleLoader__.load({
 			};
 			react.useEffect(() => { refresh(); const iv = setInterval(refresh, 30000); return () => clearInterval(iv); }, []);
 
-			const openSettings = () => {
-				setOpen(false);
-				try {
-					const conn = ctx.get("connection");
-					if (conn && conn.api && conn.api.settings) {
-						conn.api.settings.openDocument({}).catch((e) => {
-							window.alert(t("openSettingsFailed", { error: e && e.message ? e.message : String(e) }));
-						});
-						return;
-					}
-				} catch (e) {
-					window.alert(t("openSettingsFailed", { error: e && e.message ? e.message : String(e) }));
+			const createSoul = async () => {
+				const n = newName.trim();
+				if (!n) {
+					window.alert(t("createNeedsName"));
 					return;
 				}
-				window.alert(t("openSettingsFailed", { error: "connection unavailable" }));
+				setBusy(true);
+				try {
+					await post("/new", { name: n });
+					await switchTo(n);
+				} catch (e) {
+					window.alert(e.message);
+				}
+				setBusy(false);
 			};
 
 			const switchTo = async (name) => {
@@ -446,8 +449,8 @@ window.__ModuleLoader__.load({
 			};
 
 			const face = {
-				width: 24,
-				height: 24,
+				width: 22,
+				height: 22,
 				borderRadius: "50%",
 				objectFit: "cover",
 				background: "#eef1f5",
@@ -461,21 +464,39 @@ window.__ModuleLoader__.load({
 
 			const badgeBtn = react.createElement("button", {
 				type: "button",
-				style: {
+				style: wide ? {
+					boxSizing: "border-box",
 					display: "flex",
 					alignItems: "center",
 					gap: 8,
-					width: "100%",
-					boxSizing: "border-box",
-					padding: wide ? "7px 10px" : "6px 0",
+					width: "calc(100% + 8px)",
+					height: 34,
+					margin: "4px -4px",
+					padding: "6px 2px 6px 10px",
 					border: 0,
-					borderRadius: 8,
+					borderRadius: 12,
 					background: "none",
 					cursor: "pointer",
 					color: "#1c2024",
 					font: "inherit",
+					fontSize: 14,
+					lineHeight: 22,
 					textAlign: "left",
-					justifyContent: wide ? "flex-start" : "center"
+					justifyContent: "flex-start"
+				} : {
+					boxSizing: "border-box",
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "center",
+					width: 36,
+					height: 36,
+					margin: "8px 0 10px",
+					padding: 0,
+					border: 0,
+					borderRadius: "50%",
+					background: "none",
+					cursor: "pointer",
+					color: "#1c2024"
 				},
 				title: soul ? t("badgeTitle", { name: soul.name }) : t("badgeNoSoul"),
 				onClick: () => setOpen(!open)
@@ -483,7 +504,7 @@ window.__ModuleLoader__.load({
 				avatarSrc !== null
 					? react.createElement("img", { src: avatarSrc, style: face, alt: soul ? soul.name : "" })
 					: react.createElement("div", { style: face }, "🌸"),
-				wide && react.createElement("span", { style: { fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+				wide && react.createElement("span", { style: { fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1c2024" } },
 					soul ? soul.name : t("badgeNoSoul")));
 
 			const panel = react.createElement("div", {
@@ -532,24 +553,45 @@ window.__ModuleLoader__.load({
 					return react.createElement("div", { key: x.name, style: { display: "flex", alignItems: "center", gap: 8 } }, rowBtn);
 				}),
 				react.createElement("div", { style: { marginTop: 8, paddingTop: 8, borderTop: "1px solid #eef1f5" } },
-					react.createElement("button", {
-						type: "button",
-						style: {
-							display: "flex",
-							alignItems: "center",
-							gap: 8,
-							width: "100%",
-							padding: "5px 8px",
-							border: 0,
-							borderRadius: 6,
-							background: "none",
-							cursor: "pointer",
-							font: "inherit",
-							color: "#1c2024",
-							textAlign: "left"
-						},
-						onClick: openSettings
-					}, t("newSoulEntry"))));
+					!creating
+						? react.createElement("button", {
+							type: "button",
+							style: {
+								display: "flex",
+								alignItems: "center",
+								gap: 8,
+								width: "100%",
+								padding: "5px 8px",
+								border: 0,
+								borderRadius: 6,
+								background: "none",
+								cursor: "pointer",
+								font: "inherit",
+								color: "#1c2024",
+								textAlign: "left"
+							},
+							onClick: () => setCreating(true)
+						}, t("newSoulEntry"))
+						: react.createElement("div", { style: { display: "flex", gap: 6 } },
+							react.createElement("input", {
+								style: { flex: 1, minWidth: 0, boxSizing: "border-box", padding: "5px 8px", border: "1px solid #d4d9e0", borderRadius: 6, fontSize: 12, outline: "none", font: "inherit" },
+								value: newName,
+								placeholder: t("newPlaceholder"),
+								autoFocus: true,
+								onChange: (e) => setNewName(e.target.value),
+								onKeyDown: (e) => { if (e.key === "Enter") void createSoul(); if (e.key === "Escape") setCreating(false); }
+							}),
+							react.createElement("button", {
+								type: "button",
+								style: { padding: "5px 10px", border: 0, borderRadius: 6, background: "#1f6feb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", font: "inherit" },
+								onClick: createSoul,
+								disabled: busy
+							}, t("create")),
+							react.createElement("button", {
+								type: "button",
+								style: { padding: "5px 8px", border: "1px solid #d4d9e0", borderRadius: 6, background: "none", cursor: "pointer", fontSize: 12, color: "#5a6472", font: "inherit" },
+								onClick: () => setCreating(false)
+							}, t("cancel")))));
 
 			const overlay = react.createElement("div", {
 				style: { position: "fixed", inset: 0, zIndex: 999, background: "transparent" },
