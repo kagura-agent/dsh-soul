@@ -123,6 +123,22 @@ const agentsPath = join(fakeHome, ".dsh", "AGENTS.md");
   check(r3.body.souls[0].avatar === "avatar.png", "list: avatar reported");
 }
 
+// --- 6b. get file (editor support) ---------------------------------------------
+{
+  const r = await call("/api/dsh-soul/get", { name: "kagura", file: "SOUL.md" });
+  check(r.status === 200 && r.body.ok && r.body.content.includes("# SOUL.md"), "get: reads SOUL.md content");
+  const r2 = await call("/api/dsh-soul/get", { name: "kagura", file: "beliefs/candidates.md" });
+  check(r2.status === 200 && r2.body.ok && r2.body.content.length > 0, "get: reads beliefs content");
+  const r3 = await call("/api/dsh-soul/get", { name: "kagura", file: "../evil.md" });
+  check(r3.status === 400, "get: traversal rejected");
+  const r4 = await call("/api/dsh-soul/get", { name: "nope", file: "SOUL.md" });
+  check(r4.status === 400, "get: unknown soul rejected");
+  // edit round-trip: save then read back
+  await call("/api/dsh-soul/save", { name: "kagura", file: "SOUL.md", content: "# SOUL.md\n\nEdited.\n" });
+  const r5 = await call("/api/dsh-soul/get", { name: "kagura", file: "SOUL.md" });
+  check(r5.body.content.includes("Edited."), "get: reflects saved edit");
+}
+
 // --- 7. delete rules ----------------------------------------------------------
 {
   check((await call("/api/dsh-soul/delete", { name: "kagura" })).status === 400, "delete: active soul rejected");

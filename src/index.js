@@ -330,6 +330,7 @@ function apply(ctx, config) {
     { path: `${API_PREFIX}/new`, handler: createSoul },
     { path: `${API_PREFIX}/activate`, handler: activate },
     { path: `${API_PREFIX}/save`, handler: save },
+    { path: `${API_PREFIX}/get`, handler: getFile },
     { path: `${API_PREFIX}/delete`, handler: removeSoul },
     { path: `${API_PREFIX}/sync`, handler: sync },
     { path: `${API_PREFIX}/avatar`, handler: avatar },
@@ -479,6 +480,34 @@ function apply(ctx, config) {
     }
     // Lazy re-aggregation covers the active soul on the next list/status.
     sendJson(res, 200, { ok: true, soul: readSoul(root, dir, activeSoulName()) });
+  }
+
+  /** Read one DNA / beliefs file of a soul (for the editor UI). */
+  async function getFile(ctx, req, res) {
+    const body = await readJsonBody(req).catch(() => null);
+    const soulName = safeName(body !== null && typeof body.name === "string" ? body.name : "");
+    const rel = body !== null && typeof body.file === "string" ? body.file.trim() : "";
+    const allowed = [...DNA_FILES, "beliefs/candidates.md"];
+    if (!allowed.includes(rel) || rel.includes("..")) {
+      sendJson(res, 400, { ok: false, error: `file must be one of ${allowed.join(", ")}` });
+      return;
+    }
+    const dir = soulDir(soulsRoot(), soulName);
+    if (dir === null || !existsSync(dir)) {
+      sendJson(res, 400, { ok: false, error: `soul "${soulName}" not found` });
+      return;
+    }
+    const p = join(dir, rel);
+    try {
+      if (!existsSync(p)) {
+        sendJson(res, 404, { ok: false, error: `soul "${soulName}" has no ${rel}` });
+        return;
+      }
+      const content = readFileSync(p, "utf8");
+      sendJson(res, 200, { ok: true, name: soulName, file: rel, content });
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: `cannot read ${rel}: ${error instanceof Error ? error.message : String(error)}` });
+    }
   }
 
   async function removeSoul(ctx, req, res) {

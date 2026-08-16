@@ -47,6 +47,12 @@ window.__ModuleLoader__.load({
 			notesLabel: "日记",
 			avatarLabel: "头像",
 			uploadAvatar: "上传头像",
+			edit: "编辑",
+			backToList: "← 返回",
+			save: "保存",
+			editingHint: "保存后自动重新聚合到 ~/.dsh/AGENTS.md",
+			saved: "已保存 {file}",
+			loadFailed: "读取失败：{error}",
 			avatarUploaded: "头像已更新（{avatar}）",
 			avatarMissing: "无头像",
 			refresh: "刷新",
@@ -82,6 +88,12 @@ window.__ModuleLoader__.load({
 			notesLabel: "Notes",
 			avatarLabel: "Avatar",
 			uploadAvatar: "Upload avatar",
+			edit: "Edit",
+			backToList: "← Back",
+			save: "Save",
+			editingHint: "Saving re-aggregates into ~/.dsh/AGENTS.md automatically",
+			saved: "Saved {file}",
+			loadFailed: "Failed to load: {error}",
 			avatarUploaded: "Avatar updated ({avatar})",
 			avatarMissing: "no avatar",
 			refresh: "Refresh",
@@ -226,6 +238,7 @@ window.__ModuleLoader__.load({
 			const [active, setActive] = react.useState(null);
 			const [result, setResult] = react.useState(null);
 			const [newName, setNewName] = react.useState("");
+			const [editing, setEditing] = react.useState(null); // { name, file, content, loading }
 			const fileRef = react.useRef(null);
 			const uploadFor = react.useRef(null);
 
@@ -296,6 +309,43 @@ window.__ModuleLoader__.load({
 				setBusy(false);
 			};
 
+			const openEditor = async (soulName, file) => {
+				setEditing({ name: soulName, file, content: "", loading: true });
+				try {
+					const data = await post("/get", { name: soulName, file });
+					setEditing({ name: soulName, file, content: data.content || "", loading: false });
+				} catch (error) {
+					setResult({ kind: "err", text: t("loadFailed", { error: error.message }) });
+					setEditing(null);
+				}
+			};
+
+			const switchFile = async (file) => {
+				if (editing === null) return;
+				const name = editing.name;
+				setEditing({ name, file, content: "", loading: true });
+				try {
+					const data = await post("/get", { name, file });
+					setEditing({ name, file, content: data.content || "", loading: false });
+				} catch (error) {
+					setResult({ kind: "err", text: t("loadFailed", { error: error.message }) });
+				}
+			};
+
+			const saveEdit = async () => {
+				if (editing === null) return;
+				setBusy(true);
+				try {
+					await post("/save", { name: editing.name, file: editing.file, content: editing.content });
+					setResult({ kind: "ok", text: t("saved", { file: editing.file }) + " — " + t("editingHint") });
+					setEditing(null);
+					await load();
+				} catch (error) {
+					setResult({ kind: "err", text: t("err", { error: error.message }) });
+				}
+				setBusy(false);
+			};
+
 			const pickAvatar = (soulName) => {
 				uploadFor.current = soulName;
 				if (fileRef.current) fileRef.current.click();
@@ -343,6 +393,54 @@ window.__ModuleLoader__.load({
 						react.createElement("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif", ref: fileRef, style: { display: "none" }, onChange: onAvatarFile }),
 						react.createElement("div", { style: { fontWeight: 500, color: "#1c2024", margin: "4px 0 6px" } },
 							`${t("active")}: ${active || t("none")}`),
+						editing !== null && react.createElement("div", { style: { marginTop: 6 } },
+							react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } },
+								react.createElement("button", { type: "button", style: styles.btn, onClick: () => setEditing(null), disabled: busy }, t("backToList")),
+								react.createElement("span", { style: { fontWeight: 600, color: "#1c2024" } }, editing.name)),
+							react.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 } },
+								["IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "MEMORY.md", "beliefs/candidates.md"].map((f) =>
+									react.createElement("button", {
+										key: f,
+										type: "button",
+										style: {
+											padding: "4px 8px",
+											border: f === editing.file ? "1px solid #1f6feb" : "1px solid #d4d9e0",
+											borderRadius: 6,
+											background: f === editing.file ? "#e8f0fe" : "#f6f8fa",
+											color: "#1c2024",
+											fontSize: 11,
+											cursor: "pointer",
+											font: "inherit"
+										},
+										onClick: () => switchFile(f),
+										disabled: busy || editing.loading
+									}, f.replace(/\.md$/i, "").replace("beliefs/", "beliefs/")))),
+							react.createElement("textarea", {
+								style: {
+									width: "100%",
+									boxSizing: "border-box",
+									minHeight: 200,
+									maxHeight: 360,
+									padding: "8px",
+									border: "1px solid #d4d9e0",
+									borderRadius: 8,
+									fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+									fontSize: 12,
+									lineHeight: 1.5,
+									outline: "none",
+									resize: "vertical",
+									color: "#1c2024",
+									background: "#fafbfc"
+								},
+								value: editing.loading ? "" : editing.content,
+								placeholder: editing.loading ? t("busy") : "",
+								disabled: editing.loading || busy,
+								onChange: (e) => setEditing({ ...editing, content: e.target.value })
+							}),
+							react.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6, alignItems: "center" } },
+								react.createElement("button", { type: "button", style: styles.btnPrimary, onClick: saveEdit, disabled: busy || editing.loading }, t("save")),
+								react.createElement("button", { type: "button", style: styles.btn, onClick: () => setEditing(null), disabled: busy }, t("backToList")),
+								react.createElement("span", { style: styles.muted }, t("editingHint")))),
 						souls !== null && souls.length === 0 &&
 							react.createElement("p", { style: styles.muted }, t("noSouls")),
 						souls !== null && souls.map((s) =>
@@ -355,6 +453,7 @@ window.__ModuleLoader__.load({
 										`${t("dnaLabel")}: ${s.dna.map((f) => f.name.replace(/\.md$/i, "")).join(", ") || "—"}` +
 										(s.beliefsBytes > 0 ? ` · ${t("beliefsLabel")}: ${s.beliefsBytes}B` : "") +
 										` · ${t("notesLabel")}: ${s.notes}`)),
+								react.createElement("button", { style: styles.btn, onClick: () => openEditor(s.name, "SOUL.md"), disabled: busy }, t("edit")),
 								react.createElement("button", { style: styles.btn, onClick: () => pickAvatar(s.name), disabled: busy, title: t("uploadAvatar") }, "🖼️"),
 								!s.active &&
 									react.createElement("button", { style: styles.btnPrimary, onClick: () => runActivate(s.name), disabled: busy }, t("activate")),
