@@ -466,7 +466,7 @@ window.__ModuleLoader__.load({
 					bottom: 60,
 					left: 8,
 					zIndex: 1000,
-					width: "min(300px, calc(100vw - 16px))",
+					width: "min(220px, calc(100vw - 32px))",
 					maxHeight: "min(60vh, 420px)",
 					overflowY: "auto",
 					background: "#fff",
