@@ -16,6 +16,19 @@ window.__ModuleLoader__.load({
 		const inject = ["slots", "locale", "connection"];
 
 		const API = "/api/dsh-soul";
+
+		/** Shared JSON POST helper (module-level so every component uses one copy). */
+		const post = async (path, payload) => {
+			const res = await fetch(API + path, {
+				method: "POST",
+				credentials: "same-origin",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify(payload)
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+			return data;
+		};
 		const NS = "dsh-soul";
 		const zh = {
 			subtitle: "养一个会自进化的 AI 伙伴：灵魂 DNA + 经历 + 成长",
@@ -402,18 +415,6 @@ window.__ModuleLoader__.load({
 				}).catch(() => {});
 			};
 			react.useEffect(() => { refresh(); const iv = setInterval(refresh, 30000); return () => clearInterval(iv); }, []);
-
-			const post = async (path, payload) => {
-				const res = await fetch(API + path, {
-					method: "POST",
-					credentials: "same-origin",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify(payload)
-				});
-				const data = await res.json().catch(() => ({}));
-				if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
-				return data;
-			};
 
 			const openSettings = () => {
 				setOpen(false);
