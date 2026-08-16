@@ -210,6 +210,7 @@ window.__ModuleLoader__.load({
 			const [souls, setSouls] = react.useState(null);
 			const [active, setActive] = react.useState(null);
 			const [result, setResult] = react.useState(null);
+			const [newName, setNewName] = react.useState("");
 			const fileRef = react.useRef(null);
 			const uploadFor = react.useRef(null);
 
