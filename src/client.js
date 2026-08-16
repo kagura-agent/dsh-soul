@@ -594,7 +594,7 @@ window.__ModuleLoader__.load({
 			// The active soul's face, always visible at the sidebar footer.
 			slots.inject("sidebar.footer.action", () => slots.register(
 				{ name: "sidebar.footer.action", id: "dsh-soul-active", order: 10, label: "dsh-soul" },
-				(wide) => react.createElement(ActiveSoulBadge, { ctx, wide })
+				({ wide }) => react.createElement(ActiveSoulBadge, { ctx, wide })
 			));
 		}
 
