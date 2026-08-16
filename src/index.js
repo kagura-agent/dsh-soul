@@ -483,8 +483,9 @@ function apply(ctx, config) {
     sendJson(res, 200, { ok: true, soul: readSoul(root, dir, activeSoulName()) });
   }
 
-  /** Growth record for a soul: manifest (activations, DNA changes) plus
-   * counts and recent daily-note names — what the '成长' view renders. */
+  /** Growth record for a soul: the story of how it came to be and what it
+   * has accumulated — real daily notes, real belief candidates, DNA edits.
+   * Birth = earliest daily note (not the DSH migration date). */
   async function growth(ctx, req, res) {
     const body = await readJsonBody(req).catch(() => null);
     const soulName = safeName(body !== null && typeof body.name === "string" ? body.name : "");
@@ -494,32 +495,74 @@ function apply(ctx, config) {
       return;
     }
     const manifest = readManifest(dir) || { name: soulName, createdAt: null, activations: [], dnaChanges: [], migrations: [] };
-    // beliefs: count dated candidate entries (rough: lines containing a date)
-    let beliefsCount = 0;
-    let beliefsRecent = [];
-    try {
-      const bp = join(dir, "beliefs", "candidates.md");
-      if (existsSync(bp)) {
-        const text = readFileSync(bp, "utf8");
-        const lines = text.split("\n");
-        beliefsCount = lines.filter((l) => /\d{4}-\d{2}-\d{2}/.test(l)).length;
-        // last few candidate bullets
-        beliefsRecent = lines.filter((l) => /^\s*-/.test(l)).slice(-5).map((l) => l.replace(/^\s*-\s*/, "").slice(0, 120));
-      }
-    } catch { /* ignore */ }
-    // recent daily notes (newest filenames)
-    let notes = [];
+
+    // --- daily notes: real ones only (YYYY-MM-DD*.md), newest last ----------
+    let notes = []; // { name, date, preview }
+    let notesCount = 0;
     try {
       const mp = join(dir, "memory");
       if (existsSync(mp)) {
-        notes = readdirSync(mp)
-          .filter((n) => n.endsWith(".md"))
-          .sort()
-          .slice(-5)
-          .reverse();
+        const files = readdirSync(mp).filter((n) => /^\d{4}-\d{2}-\d{2}/.test(n) && n.endsWith(".md"));
+        notesCount = files.length;
+        const newest = files.sort().slice(-5).reverse();
+        for (const f of newest) {
+          let preview = "";
+          try {
+            const bodyText = readFileSync(join(mp, f), "utf8").split("\n");
+            for (const ln of bodyText) {
+              const t = ln.trim();
+              if (t && !t.startsWith("#") && !t.startsWith("---")) { preview = t.slice(0, 120); break; }
+            }
+          } catch { /* ignore */ }
+          notes.push({ name: f, date: f.slice(0, 10), preview });
+        }
       }
     } catch { /* ignore */ }
-    sendJson(res, 200, { ok: true, name: soulName, manifest, beliefsCount, beliefsRecent, notes });
+
+    // --- beliefs: count real candidate bullets (`- YYYY-MM-DD: ...` / `- [YYYY-MM-DD]`)
+    let beliefsCount = 0;
+    let beliefsRecent = []; // { date, text }
+    try {
+      const bp = join(dir, "beliefs", "candidates.md");
+      if (existsSync(bp)) {
+        const lines = readFileSync(bp, "utf8").split("\n");
+        const entries = [];
+        for (const l of lines) {
+          const m = l.match(/^\s*-\s*(\[?(\d{4}-\d{2}-\d{2})\]?:?)\s*(.*)$/);
+          if (m) {
+            entries.push({ date: m[2], text: (m[1].startsWith("[") ? m[3] : m[3]).trim() });
+          }
+        }
+        beliefsCount = entries.length;
+        beliefsRecent = entries.slice(-5).reverse();
+      }
+    } catch { /* ignore */ }
+
+    // --- birth: earliest daily note wins; else migration date -----------------
+    let born = null;
+    try {
+      const mp = join(dir, "memory");
+      if (existsSync(mp)) {
+        const dates = readdirSync(mp)
+          .map((n) => n.match(/^(\d{4}-\d{2}-\d{2})/))
+          .filter(Boolean)
+          .map((m) => m[1])
+          .sort();
+        if (dates.length > 0) born = dates[0];
+      }
+    } catch { /* ignore */ }
+    if (born === null && manifest.createdAt) born = manifest.createdAt.slice(0, 10);
+
+    sendJson(res, 200, {
+      ok: true,
+      name: soulName,
+      manifest,
+      born,
+      notesCount,
+      beliefsCount,
+      notes,
+      beliefsRecent,
+    });
   }
 
   /** Read one DNA / beliefs file of a soul (for the editor UI). */

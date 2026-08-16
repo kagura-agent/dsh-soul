@@ -56,17 +56,23 @@ window.__ModuleLoader__.load({
 			tabConfig: "配置",
 			tabGrowth: "成长",
 			growthBorn: "出生于 {ts}",
-			growthWakeups: "醒来 {n} 次",
+			growthDays: "已陪伴 {n} 天",
 			growthDnaChanges: "DNA 修改 {n} 次",
 			growthBeliefs: "候选教训 {n} 条",
 			growthNotes: "日记 {n} 篇",
 			growthTimeline: "成长时间线",
-			growthEventWake: "醒来（第 {n} 次）",
+			growthSectionDna: "DNA 修改",
+			growthSectionNotes: "最近的日记",
+			growthSectionBeliefs: "最近的候选教训",
 			growthEventDna: "修改了 {file}",
-			growthEventBelief: "新增候选教训",
-			growthEventNote: "日记",
+			growthEventNote: "{name}",
+			growthEventBelief: "{date}",
 			growthEventBorn: "出生",
+			growthEventMigrate: "迁入 DSH",
 			growthNoEvents: "还没有成长记录",
+			growthNoDna: "还没有修改过 DNA",
+			growthNoNotes: "还没有日记",
+			growthNoBeliefs: "还没有候选教训",
 			save: "保存",
 			editingHint: "保存后自动重新聚合到 ~/.dsh/AGENTS.md",
 			saved: "已保存 {file}",
@@ -115,17 +121,23 @@ window.__ModuleLoader__.load({
 			tabConfig: "Config",
 			tabGrowth: "Growth",
 			growthBorn: "Born {ts}",
-			growthWakeups: "woken {n} times",
+			growthDays: "{n} days together",
 			growthDnaChanges: "{n} DNA edits",
 			growthBeliefs: "{n} belief candidates",
 			growthNotes: "{n} notes",
 			growthTimeline: "Growth timeline",
-			growthEventWake: "Woke up (#{n})",
+			growthSectionDna: "DNA edits",
+			growthSectionNotes: "Recent notes",
+			growthSectionBeliefs: "Recent belief candidates",
 			growthEventDna: "Edited {file}",
-			growthEventBelief: "New belief candidate",
-			growthEventNote: "Note",
+			growthEventNote: "{name}",
+			growthEventBelief: "{date}",
 			growthEventBorn: "Born",
+			growthEventMigrate: "Migrated to DSH",
 			growthNoEvents: "No growth yet",
+			growthNoDna: "No DNA edits yet",
+			growthNoNotes: "No notes yet",
+			growthNoBeliefs: "No belief candidates yet",
 			save: "Save",
 			editingHint: "Saving re-aggregates into ~/.dsh/AGENTS.md automatically",
 			saved: "Saved {file}",
@@ -657,42 +669,55 @@ window.__ModuleLoader__.load({
 					react.createElement("span", { style: { color: "#8a94a3", fontSize: 12 } }, t("editingHint"))));
 		}
 
-		/** Growth view: the soul's life — born/wakeups/DNA edits timeline. */
+		/** Growth view: the soul's life — born date, day count, DNA edits,
+		 * recent notes and belief candidates, each in its own section. */
 		function GrowthView({ data, t }) {
 			if (data === null) {
 				return react.createElement("div", { style: { color: "#8a94a3", fontSize: 12 } }, t("busy"));
 			}
 			const m = data.manifest || {};
-			const events = [];
-			if (m.createdAt) events.push({ ts: m.createdAt, kind: "born" });
-			(m.activations || []).forEach((ts, i) => events.push({ ts, kind: "wake", n: i + 1 }));
-			(m.dnaChanges || []).forEach((c) => events.push({ ts: c.ts, kind: "dna", file: c.file }));
-			(data.beliefsRecent || []).forEach((b) => events.push({ ts: null, kind: "belief", text: b }));
-			(data.notes || []).forEach((n) => events.push({ ts: null, kind: "note", text: n }));
-			events.sort((a, b) => (b.ts || "").localeCompare(a.ts || ""));
+			const born = data.born || (m.createdAt || "").slice(0, 10) || "?";
+			let days = null;
+			if (born !== "?") {
+				const start = new Date(born).getTime();
+				if (!Number.isNaN(start)) days = Math.max(1, Math.floor((Date.now() - start) / 86400000) + 1);
+			}
+			const dna = (m.dnaChanges || []).slice().reverse();
+			const notes = data.notes || [];
+			const beliefs = data.beliefsRecent || [];
 
 			const chip = (label) => react.createElement("span", { style: { fontSize: 12, color: "#5a6472" } }, label);
+			const sectionTitle = (text) => react.createElement("div", { style: { fontWeight: 600, color: "#1c2024", marginTop: 4 } }, text);
+			const row = (key, dateText, main, sub) => react.createElement("div", { key, style: { display: "flex", gap: 10, padding: "5px 0", borderBottom: "1px solid #f1f3f6", alignItems: "flex-start" } },
+				react.createElement("span", { style: { flex: "none", width: 96, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 1 } }, dateText),
+				react.createElement("div", { style: { minWidth: 0, flex: 1 } },
+					react.createElement("div", { style: { fontSize: 12, color: "#1c2024" } }, main),
+					sub === null ? null : react.createElement("div", { style: { fontSize: 11.5, color: "#8a94a3", marginTop: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, sub)));
+
 			return react.createElement("div", { style: { flex: 1, minHeight: 0, padding: "12px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 } },
 				react.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", padding: "10px 12px", border: "1px solid #e4e8ee", borderRadius: 10, background: "#fafbfc" } },
-					chip(t("growthBorn", { ts: (m.createdAt || "").slice(0, 10) || "?" })),
-					chip(t("growthWakeups", { n: (m.activations || []).length })),
-					chip(t("growthDnaChanges", { n: (m.dnaChanges || []).length })),
-					chip(t("growthBeliefs", { n: data.beliefsCount || 0 })),
-					chip(t("growthNotes", { n: (data.notes || []).length }))),
-				react.createElement("div", { style: { fontWeight: 600, color: "#1c2024" } }, t("growthTimeline")),
-				events.length === 0
-					? react.createElement("div", { style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoEvents"))
-					: react.createElement("div", { style: { display: "flex", flexDirection: "column" } },
-						events.map((ev, i) => {
-							const label = ev.kind === "born" ? "🎂 " + t("growthEventBorn")
-								: ev.kind === "wake" ? "🌅 " + t("growthEventWake", { n: ev.n })
-								: ev.kind === "dna" ? "✏️ " + t("growthEventDna", { file: ev.file })
-								: ev.kind === "belief" ? "💡 " + t("growthEventBelief") + "：" + ev.text
-								: "📓 " + t("growthEventNote") + "：" + ev.text;
-							return react.createElement("div", { key: i, style: { display: "flex", gap: 8, padding: "4px 0", borderBottom: "1px solid #f1f3f6" } },
-								react.createElement("span", { style: { flex: "none", width: 132, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 1 } }, ev.ts ? ev.ts.replace("T", " ").slice(0, 16) : "—"),
-								react.createElement("span", { style: { fontSize: 12, color: "#1c2024", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, label));
-						})));
+					chip("🎂 " + t("growthBorn", { ts: born })),
+					chip(days !== null ? "📆 " + t("growthDays", { n: days }) : ""),
+					chip("📓 " + t("growthNotes", { n: data.notesCount || 0 })),
+					chip("💡 " + t("growthBeliefs", { n: data.beliefsCount || 0 })),
+					chip("✏️ " + t("growthDnaChanges", { n: dna.length }))),
+				sectionTitle(t("growthTimeline")),
+				row("born", born, "🎂 " + t("growthEventBorn"), null),
+				...(m.createdAt && m.createdAt.slice(0, 10) !== born
+					? [row("migrate", (m.createdAt || "").slice(0, 10), "🚀 " + t("growthEventMigrate"), null)]
+					: []),
+				sectionTitle(t("growthSectionDna")),
+				...(dna.length === 0
+					? [react.createElement("div", { key: "nodna", style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoDna"))]
+					: dna.map((c, i) => row("dna" + i, (c.ts || "").slice(0, 10), "✏️ " + t("growthEventDna", { file: c.file }), null))),
+				sectionTitle(t("growthSectionNotes")),
+				...(notes.length === 0
+					? [react.createElement("div", { key: "nonotes", style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoNotes"))]
+					: notes.map((n, i) => row("note" + i, n.date || "", "📓 " + t("growthEventNote", { name: n.name }), n.preview || null))),
+				sectionTitle(t("growthSectionBeliefs")),
+				...(beliefs.length === 0
+					? [react.createElement("div", { key: "nobeliefs", style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoBeliefs"))]
+					: beliefs.map((b, i) => row("belief" + i, b.date || "", "💡 " + t("growthEventBelief", { date: b.date || "" }), b.text || null))));
 		}
 
 		/** Large soul-config modal: the soul list on the left (each row with an
@@ -859,7 +884,8 @@ window.__ModuleLoader__.load({
 			const detail = { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" };
 			const header = { display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderBottom: "1px solid #e4e8ee", flex: "none" };
 			const face = { width: 40, height: 40, borderRadius: "50%", objectFit: "cover", background: "#eef1f5", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer" };
-			const tabs = { display: "flex", gap: 4, flexWrap: "wrap", padding: "10px 18px 0" };
+			const tabs = { display: "flex", gap: 2, flexWrap: "wrap", padding: "0 18px", borderBottom: "1px solid #e4e8ee", flex: "none" };
+			const fileTabs = { display: "flex", gap: 4, flexWrap: "wrap", padding: "10px 18px 0" };
 			const tabStyle = (f) => ({
 				padding: "5px 10px",
 				border: f === file ? "1px solid #1f6feb" : "1px solid #d4d9e0",
@@ -870,16 +896,19 @@ window.__ModuleLoader__.load({
 				cursor: "pointer",
 				font: "inherit"
 			});
+			// Config / Growth: real tabs with an active underline, like DSH's own
+			// settings tabs — not pill buttons.
 			const mainTab = (k) => ({
-				padding: "6px 12px",
-				border: k === tab ? "1px solid #1f6feb" : "1px solid #d4d9e0",
-				borderRadius: 7,
-				background: k === tab ? "#e8f0fe" : "#f6f8fa",
-				color: "#1c2024",
-				fontSize: 12,
+				padding: "9px 14px",
+				border: 0,
+				borderBottom: k === tab ? "2px solid #1f6feb" : "2px solid transparent",
+				background: "none",
+				color: k === tab ? "#1f6feb" : "#5a6472",
+				fontSize: 13,
 				fontWeight: k === tab ? 600 : 400,
 				cursor: "pointer",
-				font: "inherit"
+				font: "inherit",
+				marginBottom: -1
 			});
 			const body = { flex: 1, minHeight: 0, padding: "10px 18px 14px", display: "flex", flexDirection: "column" };
 			const ta = {
@@ -972,7 +1001,7 @@ window.__ModuleLoader__.load({
 										setTab("config");
 									}
 								}, disabled: busy || loading }, t(k === "config" ? "tabConfig" : "tabGrowth")))),
-						tab === "config" && react.createElement("div", { style: tabs },
+						tab === "config" && react.createElement("div", { style: fileTabs },
 							files.map((f) =>
 								react.createElement("button", { key: f, type: "button", style: tabStyle(f), onClick: () => loadFile(current, f), disabled: busy || loading }, f.replace(/\.md$/i, "")))),
 						tab === "config" && react.createElement("div", { style: body },
