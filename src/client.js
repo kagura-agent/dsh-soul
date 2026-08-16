@@ -51,7 +51,6 @@ window.__ModuleLoader__.load({
 			backToList: "← 返回",
 			detailTitle: "灵魂配置",
 			newSoul: "新建灵魂",
-			viewTab: "灵魂",
 			createNamePlaceholder: "灵魂名字（如 kagura）",
 			close: "关闭",
 			save: "保存",
@@ -97,7 +96,6 @@ window.__ModuleLoader__.load({
 			backToList: "← Back",
 			detailTitle: "Soul config",
 			newSoul: "New soul",
-			viewTab: "Soul",
 			createNamePlaceholder: "Soul name (e.g. kagura)",
 			close: "Close",
 			save: "Save",
@@ -631,138 +629,6 @@ window.__ModuleLoader__.load({
 					react.createElement("span", { style: { color: "#8a94a3", fontSize: 12 } }, t("editingHint"))));
 		}
 
-		/** Embedded soul-config view: rendered inside the conversation area via
-		 * the conversation.view slot (a tab in the session header). Same
-		 * list+detail layout as the modal, but fills the view area. */
-		function SoulConfigView({ ctx }) {
-			const [busy, setBusy] = react.useState(false);
-			const [souls, setSouls] = react.useState(null);
-			const [current, setCurrent] = react.useState(null);
-			const [active, setActive] = react.useState(false);
-			const [file, setFile] = react.useState("SOUL.md");
-			const [content, setContent] = react.useState("");
-			const [loading, setLoading] = react.useState(true);
-			const [creating, setCreating] = react.useState(false);
-			const [newName, setNewName] = react.useState("");
-			const t = ctx.locale.bind(NS);
-			const [, forceRender] = react.useReducer((x) => x + 1, 0);
-			react.useEffect(() => ctx.locale.subscribe(() => forceRender()), [ctx]);
-
-			const post = async (path, payload) => {
-				const res = await fetch(API + path, {
-					method: "POST",
-					credentials: "same-origin",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify(payload)
-				});
-				const data = await res.json().catch(() => ({}));
-				if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
-				return data;
-			};
-
-			const refreshList = async () => {
-				try {
-					const data = await post("/list", {});
-					setSouls(data.souls || []);
-					setActive(data.active || null);
-					if (current === null) {
-						const first = (data.souls || []).find((x) => x.active) || (data.souls || [])[0];
-						if (first) void loadFile(first.name, "SOUL.md");
-					}
-				} catch (e) { /* ignore */ }
-			};
-
-			const loadFile = async (name, f) => {
-				setCurrent(name);
-				setFile(f);
-				setLoading(true);
-				try {
-					const data = await post("/get", { name, file: f });
-					setContent(data.content || "");
-				} catch (e) {
-					window.alert(t("loadFailed", { error: e.message }));
-				}
-				setLoading(false);
-			};
-
-			const selectSoul = (name) => { void loadFile(name, "SOUL.md"); };
-			const saveFile = async () => {
-				setBusy(true);
-				try {
-					await post("/save", { name: current, file, content });
-					window.alert(t("saved", { file }) + " — " + t("editingHint"));
-				} catch (e) { window.alert(e.message); }
-				setBusy(false);
-			};
-			const activateSoul = async (name) => {
-				setBusy(true);
-				try {
-					await post("/activate", { name });
-					await refreshList();
-				} catch (e) { window.alert(e.message); }
-				setBusy(false);
-			};
-			const createSoul = async () => {
-				const n = newName.trim();
-				if (!n) { window.alert(t("createNeedsName")); return; }
-				setBusy(true);
-				try {
-					await post("/new", { name: n });
-					setNewName("");
-					setCreating(false);
-					await refreshList();
-					await loadFile(n, "SOUL.md");
-				} catch (e) { window.alert(e.message); }
-				setBusy(false);
-			};
-
-			react.useEffect(() => { void refreshList(); }, []);
-
-			const files = ["IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "MEMORY.md", "beliefs/candidates.md"];
-			const root = { display: "flex", height: "100%", color: "#1c2024", fontSize: 13, fontFamily: "inherit" };
-			const sideList = { flex: "none", width: 200, borderRight: "1px solid #e4e8ee", overflowY: "auto", padding: "12px", boxSizing: "border-box", background: "#fafbfc" };
-			const sideRow = (selected) => ({ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 8px", border: 0, borderRadius: 8, background: selected ? "#e8f0fe" : "none", cursor: "pointer", font: "inherit", color: "inherit", textAlign: "left", marginBottom: 2 });
-			const detail = { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" };
-			const header = { display: "flex", alignItems: "center", gap: 10, padding: "12px 20px", borderBottom: "1px solid #e4e8ee", flex: "none" };
-			const tabs = { display: "flex", gap: 4, flexWrap: "wrap", padding: "10px 20px 0" };
-			const tabStyle = (f) => ({ padding: "5px 10px", border: f === file ? "1px solid #1f6feb" : "1px solid #d4d9e0", borderRadius: 7, background: f === file ? "#e8f0fe" : "#f6f8fa", color: "#1c2024", fontSize: 12, cursor: "pointer", font: "inherit" });
-			const body = { flex: 1, minHeight: 0, padding: "10px 20px 16px", display: "flex", flexDirection: "column" };
-			const ta = { flex: 1, minHeight: 0, boxSizing: "border-box", width: "100%", padding: "10px", border: "1px solid #d4d9e0", borderRadius: 8, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12.5, lineHeight: 1.5, outline: "none", resize: "none", background: "#fafbfc", color: "#1c2024" };
-			const footer = { display: "flex", gap: 8, alignItems: "center", padding: "10px 20px 14px", borderTop: "1px solid #e4e8ee", flex: "none" };
-
-			return react.createElement("div", { style: root },
-				react.createElement("div", { style: sideList },
-					souls === null && react.createElement("div", { style: { color: "#8a94a3", fontSize: 12 } }, t("busy")),
-					souls !== null && souls.map((x) => {
-						const selected = x.name === current;
-						const rowBtn = react.createElement("button", { type: "button", style: { ...sideRow(selected), flex: 1 }, onClick: () => selectSoul(x.name), disabled: busy },
-							react.createElement(SoulFace, { soul: x }),
-							react.createElement("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: x.active ? 600 : 400 } }, x.name + (x.active ? " ✓" : "")));
-						const actBtn = !x.active ? react.createElement("button", { type: "button", style: { padding: "3px 7px", border: "1px solid #d4d9e0", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 11, color: "#5a6472", font: "inherit", flex: "none" }, onClick: () => activateSoul(x.name), disabled: busy }, t("activate")) : null;
-						return react.createElement("div", { key: x.name, style: { display: "flex", alignItems: "center", gap: 4 } }, rowBtn, actBtn);
-					}),
-					react.createElement("div", { style: { marginTop: 6, paddingTop: 6, borderTop: "1px solid #e4e8ee" } },
-						!creating
-							? react.createElement("button", { type: "button", style: { ...sideRow(false), color: "#1f6feb", fontWeight: 500 }, onClick: () => setCreating(true), disabled: busy }, "＋ " + t("newSoul"))
-							: react.createElement("div", { style: { display: "flex", gap: 4 } },
-								react.createElement("input", { style: { flex: 1, minWidth: 0, boxSizing: "border-box", padding: "5px 8px", border: "1px solid #d4d9e0", borderRadius: 6, fontSize: 12, outline: "none", font: "inherit" }, value: newName, placeholder: t("createNamePlaceholder"), autoFocus: true, onChange: (e) => setNewName(e.target.value), onKeyDown: (e) => { if (e.key === "Enter") void createSoul(); if (e.key === "Escape") setCreating(false); } }),
-								react.createElement("button", { type: "button", style: { padding: "5px 9px", border: 0, borderRadius: 6, background: "#1f6feb", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: createSoul, disabled: busy }, t("create"))))),
-				react.createElement("div", { style: detail },
-					react.createElement("div", { style: header },
-						react.createElement("div", { style: { flex: 1, minWidth: 0 } },
-							react.createElement("div", { style: { fontWeight: 600, fontSize: 15 } }, current || "…"),
-							react.createElement("div", { style: { fontSize: 12, color: "#8a94a3" } }, active === current ? t("activeBadge") : t("detailTitle"))),
-						current !== null &&
-							react.createElement("button", { type: "button", style: { padding: "6px 12px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: () => activateSoul(current), disabled: busy }, t("activate"))),
-					current !== null && react.createElement("div", { style: tabs },
-						files.map((f) => react.createElement("button", { key: f, type: "button", style: tabStyle(f), onClick: () => loadFile(current, f), disabled: busy || loading }, f.replace(/\.md$/i, "")))),
-					current !== null && react.createElement("div", { style: body },
-						react.createElement("textarea", { style: ta, value: loading ? "" : content, placeholder: loading ? t("busy") : "", disabled: loading || busy, onChange: (e) => setContent(e.target.value) })),
-					current !== null && react.createElement("div", { style: footer },
-						react.createElement("button", { type: "button", style: { padding: "7px 16px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: saveFile, disabled: busy || loading }, t("save")),
-						react.createElement("span", { style: { fontSize: 12, color: "#8a94a3" } }, t("editingHint")))));
-		}
-
 		/** Large soul-config modal: the soul list on the left (each row with an
 		 * Activate button), the selected soul's full config on the right. One
 		 * entry point from the sidebar — no intermediate switcher menu. */
@@ -1072,13 +938,7 @@ window.__ModuleLoader__.load({
 				{ name: "settings.plugin.item", id: "dsh-soul", order: 45, label: "dsh-soul" },
 				() => react.createElement(Boundary, null, react.createElement(SoulCard, { ctx }))
 			));
-			// A session-header view tab: renders the soul config inside the
-			// conversation area (DSH's native view-switch mechanism).
-			slots.inject("conversation.view", () => slots.register(
-				{ name: "conversation.view", id: "dsh-soul", order: 30, label: () => (ctx.get("locale") ? ctx.locale.bind(NS)("viewTab") : "Soul") },
-				() => react.createElement(Boundary, null, react.createElement(SoulConfigView, { ctx }))
-			));
-			// The active soul's face + a new-soul entry, always visible at the sidebar footer.
+			// The active soul's face, always visible at the sidebar footer.
 			slots.inject("sidebar.footer.action", () => slots.register(
 				{ name: "sidebar.footer.action", id: "dsh-soul-active", order: 10, label: "dsh-soul" },
 				({ wide }) => react.createElement(Boundary, null, react.createElement(ActiveSoulBadge, { ctx, wide }))
