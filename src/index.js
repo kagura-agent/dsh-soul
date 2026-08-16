@@ -553,6 +553,20 @@ function apply(ctx, config) {
     } catch { /* ignore */ }
     if (born === null && manifest.createdAt) born = manifest.createdAt.slice(0, 10);
 
+    // --- monthly activity: notes per month, oldest → newest ------------------
+    let monthly = []; // { month: "YYYY-MM", count }
+    try {
+      const mp = join(dir, "memory");
+      if (existsSync(mp)) {
+        const counts = {};
+        for (const n of readdirSync(mp)) {
+          const m = n.match(/^(\d{4}-\d{2})-\d{2}/);
+          if (m) counts[m[1]] = (counts[m[1]] || 0) + 1;
+        }
+        monthly = Object.keys(counts).sort().map((month) => ({ month, count: counts[month] }));
+      }
+    } catch { /* ignore */ }
+
     sendJson(res, 200, {
       ok: true,
       name: soulName,
@@ -560,6 +574,7 @@ function apply(ctx, config) {
       born,
       notesCount,
       beliefsCount,
+      monthly,
       notes,
       beliefsRecent,
     });

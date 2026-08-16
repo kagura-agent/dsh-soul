@@ -150,6 +150,7 @@ const agentsPath = join(fakeHome, ".dsh", "AGENTS.md");
   check(Array.isArray(r.body.notes) && r.body.notes.every((n) => typeof n.name === "string" && typeof n.date === "string"), "growth: notes carry name+date");
   check(Array.isArray(r.body.beliefsRecent) && r.body.beliefsRecent.every((b) => typeof b.date === "string" && typeof b.text === "string"), "growth: beliefsRecent carry date+text");
   check(typeof r.body.born === "string", "growth: born is a date string");
+  check(Array.isArray(r.body.monthly) && r.body.monthly.every((x) => typeof x.month === "string" && typeof x.count === "number"), "growth: monthly activity array present");
   check((await call("/api/dsh-soul/growth", { name: "nope" })).status === 400, "growth: unknown soul rejected");
 }
 

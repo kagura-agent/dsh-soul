@@ -61,6 +61,7 @@ window.__ModuleLoader__.load({
 			growthBeliefs: "候选教训 {n} 条",
 			growthNotes: "日记 {n} 篇",
 			growthTimeline: "成长时间线",
+			growthActivity: "每月活动",
 			growthSectionDna: "DNA 修改",
 			growthSectionNotes: "最近的日记",
 			growthSectionBeliefs: "最近的候选教训",
@@ -126,6 +127,7 @@ window.__ModuleLoader__.load({
 			growthBeliefs: "{n} belief candidates",
 			growthNotes: "{n} notes",
 			growthTimeline: "Growth timeline",
+			growthActivity: "Activity per month",
 			growthSectionDna: "DNA edits",
 			growthSectionNotes: "Recent notes",
 			growthSectionBeliefs: "Recent belief candidates",
@@ -669,8 +671,9 @@ window.__ModuleLoader__.load({
 					react.createElement("span", { style: { color: "#8a94a3", fontSize: 12 } }, t("editingHint"))));
 		}
 
-		/** Growth view: the soul's life — born date, day count, DNA edits,
-		 * recent notes and belief candidates, each in its own section. */
+		/** Growth view: the soul's life story — stat cards, a monthly activity
+		 * chart (the growth curve), a timeline of milestones, then recent notes
+		 * and belief candidates. */
 		function GrowthView({ data, t }) {
 			if (data === null) {
 				return react.createElement("div", { style: { color: "#8a94a3", fontSize: 12 } }, t("busy"));
@@ -685,39 +688,68 @@ window.__ModuleLoader__.load({
 			const dna = (m.dnaChanges || []).slice().reverse();
 			const notes = data.notes || [];
 			const beliefs = data.beliefsRecent || [];
+			const monthly = data.monthly || [];
+			const maxCount = Math.max(1, ...monthly.map((x) => x.count));
 
-			const chip = (label) => react.createElement("span", { style: { fontSize: 12, color: "#5a6472" } }, label);
-			const sectionTitle = (text) => react.createElement("div", { style: { fontWeight: 600, color: "#1c2024", marginTop: 4 } }, text);
-			const row = (key, dateText, main, sub) => react.createElement("div", { key, style: { display: "flex", gap: 10, padding: "5px 0", borderBottom: "1px solid #f1f3f6", alignItems: "flex-start" } },
-				react.createElement("span", { style: { flex: "none", width: 96, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 1 } }, dateText),
-				react.createElement("div", { style: { minWidth: 0, flex: 1 } },
-					react.createElement("div", { style: { fontSize: 12, color: "#1c2024" } }, main),
-					sub === null ? null : react.createElement("div", { style: { fontSize: 11.5, color: "#8a94a3", marginTop: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, sub)));
+			const card = (label, value, accent) => react.createElement("div", { style: { flex: "1 1 110px", minWidth: 100, padding: "10px 12px", border: "1px solid #e4e8ee", borderRadius: 10, background: "#fff", display: "flex", flexDirection: "column", gap: 2 } },
+				react.createElement("span", { style: { fontSize: 11, color: "#8a94a3" } }, label),
+				react.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: accent || "#1c2024", fontVariantNumeric: "tabular-nums" } }, value));
+			const sectionTitle = (text) => react.createElement("div", { style: { fontWeight: 600, color: "#1c2024", fontSize: 13, marginTop: 6 } }, text);
 
-			return react.createElement("div", { style: { flex: 1, minHeight: 0, padding: "12px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 } },
-				react.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", padding: "10px 12px", border: "1px solid #e4e8ee", borderRadius: 10, background: "#fafbfc" } },
-					chip("🎂 " + t("growthBorn", { ts: born })),
-					chip(days !== null ? "📆 " + t("growthDays", { n: days }) : ""),
-					chip("📓 " + t("growthNotes", { n: data.notesCount || 0 })),
-					chip("💡 " + t("growthBeliefs", { n: data.beliefsCount || 0 })),
-					chip("✏️ " + t("growthDnaChanges", { n: dna.length }))),
-				sectionTitle(t("growthTimeline")),
-				row("born", born, "🎂 " + t("growthEventBorn"), null),
-				...(m.createdAt && m.createdAt.slice(0, 10) !== born
-					? [row("migrate", (m.createdAt || "").slice(0, 10), "🚀 " + t("growthEventMigrate"), null)]
+			// --- timeline: milestones (born, migrate, dna edits) -----------------
+			const tl = [];
+			tl.push({ key: "born", date: born, icon: "🎂", label: t("growthEventBorn") });
+			if (m.createdAt && m.createdAt.slice(0, 10) !== born) {
+				tl.push({ key: "migrate", date: m.createdAt.slice(0, 10), icon: "🚀", label: t("growthEventMigrate") });
+			}
+			dna.forEach((c, i) => tl.push({ key: "dna" + i, date: (c.ts || "").slice(0, 10), icon: "✏️", label: t("growthEventDna", { file: c.file }) }));
+			tl.sort((a, b) => a.date.localeCompare(b.date));
+
+			return react.createElement("div", { style: { flex: 1, minHeight: 0, padding: "14px 20px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 } },
+				// --- stat cards --------------------------------------------------
+				react.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+					card(t("growthBorn"), born, "#1f6feb"),
+					card(t("growthDays"), days !== null ? String(days) : "—"),
+					card(t("growthNotes"), String(data.notesCount || 0)),
+					card(t("growthBeliefs"), String(data.beliefsCount || 0)),
+					card(t("growthDnaChanges"), String(dna.length))),
+				// --- monthly activity chart --------------------------------------
+				...(monthly.length > 0
+					? [sectionTitle(t("growthActivity")),
+						react.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 3, height: 92, padding: "10px 12px", border: "1px solid #e4e8ee", borderRadius: 10, background: "#fff", overflowX: "auto" } },
+							monthly.map((x) =>
+								react.createElement("div", { key: x.month, title: x.month + " · " + x.count, style: { flex: "1 0 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 14 } },
+									react.createElement("div", { style: { width: "100%", maxWidth: 18, height: Math.max(2, Math.round((x.count / maxCount) * 56)), borderRadius: "3px 3px 0 0", background: x.month >= (new Date().toISOString().slice(0, 7)) ? "#1f6feb" : "#9db9e8" } }),
+									react.createElement("span", { style: { fontSize: 9, color: "#8a94a3", whiteSpace: "nowrap" } }, x.month.slice(2)))))]
 					: []),
-				sectionTitle(t("growthSectionDna")),
-				...(dna.length === 0
-					? [react.createElement("div", { key: "nodna", style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoDna"))]
-					: dna.map((c, i) => row("dna" + i, (c.ts || "").slice(0, 10), "✏️ " + t("growthEventDna", { file: c.file }), null))),
+				// --- timeline -----------------------------------------------------
+				sectionTitle(t("growthTimeline")),
+				tl.length === 0
+					? react.createElement("div", { style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoEvents"))
+					: react.createElement("div", { style: { display: "flex", flexDirection: "column" } },
+						tl.map((ev, i) => react.createElement("div", { key: ev.key, style: { display: "flex", gap: 10, position: "relative", padding: "0 0 10px 18px" } },
+							react.createElement("div", { style: { position: "absolute", left: 0, top: 3, width: 9, height: 9, borderRadius: "50%", background: i === 0 ? "#1f6feb" : "#c9d1dc" } }),
+							i < tl.length - 1 ? react.createElement("div", { style: { position: "absolute", left: 4, top: 14, bottom: 0, width: 1, background: "#e4e8ee" } }) : null,
+							react.createElement("span", { style: { flex: "none", width: 84, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 1 } }, ev.date),
+							react.createElement("span", { style: { fontSize: 12.5, color: "#1c2024" } }, ev.icon + " " + ev.label)))),
+				// --- recent notes -------------------------------------------------
 				sectionTitle(t("growthSectionNotes")),
 				...(notes.length === 0
 					? [react.createElement("div", { key: "nonotes", style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoNotes"))]
-					: notes.map((n, i) => row("note" + i, n.date || "", "📓 " + t("growthEventNote", { name: n.name }), n.preview || null))),
+					: notes.map((n, i) => react.createElement("div", { key: "note" + i, style: { display: "flex", gap: 10, padding: "6px 0", borderBottom: "1px solid #f1f3f6", alignItems: "flex-start" } },
+						react.createElement("span", { style: { flex: "none", width: 84, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 1 } }, n.date || ""),
+						react.createElement("div", { style: { minWidth: 0, flex: 1 } },
+							react.createElement("div", { style: { fontSize: 12, color: "#1c2024" } }, "📓 " + (n.name || "")),
+							n.preview ? react.createElement("div", { style: { fontSize: 11.5, color: "#8a94a3", marginTop: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, n.preview) : null)))),
+				// --- recent beliefs ------------------------------------------------
 				sectionTitle(t("growthSectionBeliefs")),
 				...(beliefs.length === 0
 					? [react.createElement("div", { key: "nobeliefs", style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoBeliefs"))]
-					: beliefs.map((b, i) => row("belief" + i, b.date || "", "💡 " + t("growthEventBelief", { date: b.date || "" }), b.text || null))));
+					: beliefs.map((b, i) => react.createElement("div", { key: "belief" + i, style: { display: "flex", gap: 10, padding: "6px 0", borderBottom: "1px solid #f1f3f6", alignItems: "flex-start" } },
+						react.createElement("span", { style: { flex: "none", width: 84, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 1 } }, b.date || ""),
+						react.createElement("div", { style: { minWidth: 0, flex: 1 } },
+							react.createElement("div", { style: { fontSize: 12, color: "#1c2024" } }, "💡 " + t("growthEventBelief", { date: b.date || "" })),
+							b.text ? react.createElement("div", { style: { fontSize: 11.5, color: "#5a6472", marginTop: 2, whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.5 } }, b.text) : null)))));
 		}
 
 		/** Large soul-config modal: the soul list on the left (each row with an
