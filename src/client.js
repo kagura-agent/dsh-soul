@@ -446,10 +446,8 @@ window.__ModuleLoader__.load({
 		 * wherever the human is talking. */
 		function ActiveSoulBadge({ ctx, wide }) {
 			const [soul, setSoul] = react.useState(null);
-			const [souls, setSouls] = react.useState(null);
-			const [detailName, setDetailName] = react.useState(null); // open config modal
+			const [detailOpen, setDetailOpen] = react.useState(false);
 			const [avatarSrc, setAvatarSrc] = react.useState(null);
-			const [open, setOpen] = react.useState(false);
 			const [busy, setBusy] = react.useState(false);
 			const t = ctx.locale.bind(NS);
 			const [, forceRender] = react.useReducer((x) => x + 1, 0);
@@ -462,9 +460,7 @@ window.__ModuleLoader__.load({
 					headers: { "content-type": "application/json" },
 					body: JSON.stringify({})
 				}).then((r) => r.json()).then((data) => {
-					const list = data.souls || [];
-					setSouls(list);
-					const active = list.find((x) => x.active) || null;
+					const active = (data.souls || []).find((x) => x.active) || null;
 					setSoul(active);
 					if (active && active.avatar) {
 						return fetch(API + "/avatar", {
@@ -481,18 +477,6 @@ window.__ModuleLoader__.load({
 				}).catch(() => {});
 			};
 			react.useEffect(() => { refresh(); const iv = setInterval(refresh, 30000); return () => clearInterval(iv); }, []);
-
-			const switchTo = async (name) => {
-				setBusy(true);
-				try {
-					await post("/activate", { name });
-					setOpen(false);
-					refresh();
-				} catch (e) {
-					window.alert(e.message);
-				}
-				setBusy(false);
-			};
 
 			const face = {
 				width: wide ? 16 : 18,
@@ -545,7 +529,7 @@ window.__ModuleLoader__.load({
 					color: "#1c2024"
 				},
 				title: soul ? t("badgeTitle", { name: soul.name }) : t("badgeNoSoul"),
-				onClick: () => setOpen(!open)
+				onClick: () => setDetailOpen(true)
 			},
 				avatarSrc !== null
 					? react.createElement("img", { src: avatarSrc, style: face, alt: soul ? soul.name : "" })
@@ -553,73 +537,12 @@ window.__ModuleLoader__.load({
 				wide && react.createElement("span", { style: { fontSize: 14, fontWeight: 400, lineHeight: 22, whiteSpace: "nowrap", overflow: "hidden", color: "#1c2024" } },
 					soul ? soul.name : t("badgeNoSoul")));
 
-			const panel = react.createElement("div", {
-				style: {
-					position: "fixed",
-					bottom: 60,
-					left: 8,
-					zIndex: 1000,
-					width: "min(220px, calc(100vw - 32px))",
-					maxHeight: "min(60vh, 420px)",
-					overflowY: "auto",
-					background: "#fff",
-					border: "1px solid #d4d9e0",
-					borderRadius: 10,
-					boxShadow: "0 8px 24px rgba(0,0,0,.18)",
-					padding: "6px",
-					fontSize: 12.5,
-					color: "#1c2024"
-				}
-			},
-				souls !== null && souls.length === 0 &&
-					react.createElement("div", { style: { color: "#8a94a3" } }, t("noSouls")),
-				souls !== null && souls.map((x) => {
-					const rowBtn = react.createElement("button", {
-						type: "button",
-						style: {
-							display: "flex",
-							alignItems: "center",
-							gap: 8,
-							width: "100%",
-							padding: "5px 8px",
-							border: 0,
-							borderRadius: 6,
-							background: "none",
-							cursor: "pointer",
-							font: "inherit",
-							color: "inherit",
-							textAlign: "left"
-						},
-						onClick: () => setDetailName(x.name),
-						disabled: busy
-					},
-						react.createElement(SoulFace, { soul: x }),
-						react.createElement("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: x.active ? 600 : 400 } },
-							x.name + (x.active ? " ✓" : "")));
-					const switchBtn = !x.active
-						? react.createElement("button", {
-							type: "button",
-							style: { padding: "3px 7px", border: "1px solid #d4d9e0", borderRadius: 6, background: "none", cursor: "pointer", fontSize: 11, color: "#5a6472", font: "inherit" },
-							onClick: () => switchTo(x.name),
-							disabled: busy,
-							title: t("activate")
-						}, t("activate"))
-						: null;
-					return react.createElement("div", { key: x.name, style: { display: "flex", alignItems: "center", gap: 6 } }, rowBtn, switchBtn);
-				}),
-				);
 
-
-			const overlay = react.createElement("div", {
-				style: { position: "fixed", inset: 0, zIndex: 999, background: "transparent" },
-				onClick: () => setOpen(false)
-			});
 
 			return react.createElement(react.Fragment, null,
 				badgeBtn,
-				detailName !== null &&
-					react.createElement(SoulDetailModal, { ctx, soulName: detailName, onClose: () => { setDetailName(null); refresh(); } }),
-				open && react.createElement(react.Fragment, null, overlay, panel));
+				detailOpen &&
+					react.createElement(SoulDetailModal, { ctx, initialName: (soul && soul.name) || "kagura", onClose: () => { setDetailOpen(false); refresh(); } }));
 		}
 
 		/** Small round face used inside the switcher list. */
@@ -702,10 +625,13 @@ window.__ModuleLoader__.load({
 					react.createElement("span", { style: { color: "#8a94a3", fontSize: 12 } }, t("editingHint"))));
 		}
 
-		/** Large soul-config modal: the full editing surface for one soul,
-		 * shown over the main area instead of buried in settings. */
-		function SoulDetailModal({ ctx, soulName, onClose }) {
+		/** Large soul-config modal: the soul list on the left (each row with an
+		 * Activate button), the selected soul's full config on the right. One
+		 * entry point from the sidebar — no intermediate switcher menu. */
+		function SoulDetailModal({ ctx, initialName, onClose }) {
 			const [busy, setBusy] = react.useState(false);
+			const [souls, setSouls] = react.useState(null);
+			const [current, setCurrent] = react.useState(initialName);
 			const [active, setActive] = react.useState(false);
 			const [file, setFile] = react.useState("SOUL.md");
 			const [content, setContent] = react.useState("");
@@ -727,11 +653,22 @@ window.__ModuleLoader__.load({
 				return data;
 			};
 
-			const loadFile = async (f) => {
+			const refreshList = async () => {
+				try {
+					const data = await post("/list", {});
+					setSouls(data.souls || []);
+					setActive(data.active || null);
+				} catch (e) {
+					/* keep current list */
+				}
+			};
+
+			const loadFile = async (name, f) => {
+				setCurrent(name);
 				setFile(f);
 				setLoading(true);
 				try {
-					const data = await post("/get", { name: soulName, file: f });
+					const data = await post("/get", { name, file: f });
 					setContent(data.content || "");
 				} catch (e) {
 					window.alert(t("loadFailed", { error: e.message }));
@@ -739,10 +676,12 @@ window.__ModuleLoader__.load({
 				setLoading(false);
 			};
 
+			const selectSoul = (name) => { void loadFile(name, "SOUL.md"); };
+
 			const saveFile = async () => {
 				setBusy(true);
 				try {
-					await post("/save", { name: soulName, file, content });
+					await post("/save", { name: current, file, content });
 					window.alert(t("saved", { file }) + " — " + t("editingHint"));
 				} catch (e) {
 					window.alert(e.message);
@@ -750,11 +689,11 @@ window.__ModuleLoader__.load({
 				setBusy(false);
 			};
 
-			const activateSoul = async () => {
+			const activateSoul = async (name) => {
 				setBusy(true);
 				try {
-					await post("/activate", { name: soulName });
-					setActive(true);
+					await post("/activate", { name });
+					await refreshList();
 				} catch (e) {
 					window.alert(e.message);
 				}
@@ -768,7 +707,7 @@ window.__ModuleLoader__.load({
 				if (!f) return;
 				setBusy(true);
 				try {
-					const res = await fetch(`${API}/avatar-upload?name=${encodeURIComponent(soulName)}`, {
+					const res = await fetch(`${API}/avatar-upload?name=${encodeURIComponent(current)}`, {
 						method: "POST",
 						credentials: "same-origin",
 						headers: { "content-type": f.type },
@@ -777,6 +716,7 @@ window.__ModuleLoader__.load({
 					const data = await res.json().catch(() => ({}));
 					if (!res.ok || !data.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
 					window.alert(t("avatarUploaded", { avatar: data.avatar }));
+					await refreshList();
 					forceRender();
 				} catch (err) {
 					window.alert(err.message);
@@ -784,22 +724,41 @@ window.__ModuleLoader__.load({
 				setBusy(false);
 			};
 
-			react.useEffect(() => { void loadFile("SOUL.md"); }, []);
+			react.useEffect(() => {
+				void refreshList();
+				void loadFile(initialName, "SOUL.md");
+			}, []);
 
 			const files = ["IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "MEMORY.md", "beliefs/candidates.md"];
 			const overlay = { position: "fixed", inset: 0, zIndex: 1000, background: "rgba(15,20,28,.45)", display: "flex", alignItems: "center", justifyContent: "center" };
 			const panel = {
-				width: "min(860px, calc(100vw - 32px))",
-				height: "min(80vh, 720px)",
+				width: "min(880px, calc(100vw - 24px))",
+				height: "min(82vh, 740px)",
 				background: "#fff",
 				borderRadius: 16,
 				boxShadow: "0 16px 48px rgba(0,0,0,.25)",
 				display: "flex",
-				flexDirection: "column",
 				overflow: "hidden",
 				color: "#1c2024",
 				fontSize: 13
 			};
+			const sideList = { flex: "none", width: 190, borderRight: "1px solid #e4e8ee", overflowY: "auto", padding: "10px", boxSizing: "border-box", background: "#fafbfc" };
+			const sideRow = (selected) => ({
+				display: "flex",
+				alignItems: "center",
+				gap: 8,
+				width: "100%",
+				padding: "7px 8px",
+				border: 0,
+				borderRadius: 8,
+				background: selected ? "#e8f0fe" : "none",
+				cursor: "pointer",
+				font: "inherit",
+				color: "inherit",
+				textAlign: "left",
+				marginBottom: 2
+			});
+			const detail = { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" };
 			const header = { display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderBottom: "1px solid #e4e8ee", flex: "none" };
 			const face = { width: 40, height: 40, borderRadius: "50%", objectFit: "cover", background: "#eef1f5", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer" };
 			const tabs = { display: "flex", gap: 4, flexWrap: "wrap", padding: "10px 18px 0" };
@@ -835,29 +794,51 @@ window.__ModuleLoader__.load({
 			return react.createElement("div", { style: overlay, onClick: (e) => { if (e.target === e.currentTarget) onClose(); } },
 				react.createElement("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif", ref: fileRef, style: { display: "none" }, onChange: onAvatarFile }),
 				react.createElement("div", { style: panel },
-					react.createElement("div", { style: header },
-						react.createElement("button", { type: "button", style: { padding: 0, border: 0, background: "none", cursor: "pointer", borderRadius: "50%", lineHeight: 0 }, onClick: pickAvatar, title: t("uploadAvatar") },
-							react.createElement(SoulFace, { soul: { name: soulName, avatar: null } })),
-						react.createElement("div", { style: { flex: 1, minWidth: 0 } },
-							react.createElement("div", { style: { fontWeight: 600, fontSize: 15 } }, soulName),
-							react.createElement("div", { style: { fontSize: 12, color: "#8a94a3" } }, active ? t("activeBadge") : t("detailTitle"))),
-						!active &&
-							react.createElement("button", { type: "button", style: { padding: "6px 12px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: activateSoul, disabled: busy }, t("activate")),
-						react.createElement("button", { type: "button", style: { padding: "6px 10px", border: "1px solid #c9d1dc", borderRadius: 8, background: "#f6f8fa", color: "#1c2024", fontSize: 12, cursor: "pointer", font: "inherit" }, onClick: onClose }, t("close"))),
-					react.createElement("div", { style: tabs },
-						files.map((f) =>
-							react.createElement("button", { key: f, type: "button", style: tabStyle(f), onClick: () => loadFile(f), disabled: busy || loading }, f.replace(/\.md$/i, "")))),
-					react.createElement("div", { style: body },
-						react.createElement("textarea", {
-							style: ta,
-							value: loading ? "" : content,
-							placeholder: loading ? t("busy") : "",
-							disabled: loading || busy,
-							onChange: (e) => setContent(e.target.value)
+					react.createElement("div", { style: sideList },
+						souls === null && react.createElement("div", { style: { color: "#8a94a3", fontSize: 12 } }, t("busy")),
+						souls !== null && souls.map((x) => {
+							const selected = x.name === current;
+							const rowBtn = react.createElement("button", {
+								type: "button",
+								style: { ...sideRow(selected), flex: 1 },
+								onClick: () => selectSoul(x.name),
+								disabled: busy
+							},
+								react.createElement(SoulFace, { soul: x }),
+								react.createElement("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: x.active ? 600 : 400 } },
+									x.name + (x.active ? " ✓" : "")));
+							const actBtn = !x.active
+								? react.createElement("button", {
+									type: "button",
+									style: { padding: "3px 7px", border: "1px solid #d4d9e0", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 11, color: "#5a6472", font: "inherit", flex: "none" },
+									onClick: () => activateSoul(x.name),
+									disabled: busy
+								}, t("activate"))
+								: null;
+							return react.createElement("div", { key: x.name, style: { display: "flex", alignItems: "center", gap: 4 } }, rowBtn, actBtn);
 						})),
-					react.createElement("div", { style: footer },
-						react.createElement("button", { type: "button", style: { padding: "7px 16px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: saveFile, disabled: busy || loading }, t("save")),
-						react.createElement("span", { style: { fontSize: 12, color: "#8a94a3" } }, t("editingHint")))));
+					react.createElement("div", { style: detail },
+						react.createElement("div", { style: header },
+							react.createElement("button", { type: "button", style: { padding: 0, border: 0, background: "none", cursor: "pointer", borderRadius: "50%", lineHeight: 0 }, onClick: pickAvatar, title: t("uploadAvatar") },
+								react.createElement(SoulFace, { soul: { name: current, avatar: null } })),
+							react.createElement("div", { style: { flex: 1, minWidth: 0 } },
+								react.createElement("div", { style: { fontWeight: 600, fontSize: 15 } }, current),
+								react.createElement("div", { style: { fontSize: 12, color: "#8a94a3" } }, active === current ? t("activeBadge") : t("detailTitle"))),
+							react.createElement("button", { type: "button", style: { padding: "6px 10px", border: "1px solid #c9d1dc", borderRadius: 8, background: "#f6f8fa", color: "#1c2024", fontSize: 12, cursor: "pointer", font: "inherit" }, onClick: onClose }, t("close"))),
+						react.createElement("div", { style: tabs },
+							files.map((f) =>
+								react.createElement("button", { key: f, type: "button", style: tabStyle(f), onClick: () => loadFile(current, f), disabled: busy || loading }, f.replace(/\.md$/i, "")))),
+						react.createElement("div", { style: body },
+							react.createElement("textarea", {
+								style: ta,
+								value: loading ? "" : content,
+								placeholder: loading ? t("busy") : "",
+								disabled: loading || busy,
+								onChange: (e) => setContent(e.target.value)
+							})),
+						react.createElement("div", { style: footer },
+							react.createElement("button", { type: "button", style: { padding: "7px 16px", border: 0, borderRadius: 8, background: "#1f6feb", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: saveFile, disabled: busy || loading }, t("save")),
+							react.createElement("span", { style: { fontSize: 12, color: "#8a94a3" } }, t("editingHint"))))));
 		}
 
 		/** Error boundary: a crash in the card or badge shows the error text
