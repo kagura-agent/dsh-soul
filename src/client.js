@@ -45,6 +45,8 @@ window.__ModuleLoader__.load({
 			deleted: "已删除灵魂 {name}",
 			activeProtected: "不能删除陪伴中的灵魂",
 			syncHint: "DNA 修改后自动重新聚合到 ~/.dsh/AGENTS.md（下次访问时生效）",
+			badgeNoSoul: "未激活灵魂",
+			badgeTitle: "当前灵魂：{name}",
 		};
 		const en = {
 			subtitle: "Raise an evolving AI companion: soul DNA + experiences + growth",
@@ -74,6 +76,8 @@ window.__ModuleLoader__.load({
 			deleted: "Deleted soul {name}",
 			activeProtected: "Cannot delete the active soul",
 			syncHint: "DNA edits re-aggregate into ~/.dsh/AGENTS.md automatically (on next visit)",
+			badgeNoSoul: "No soul active",
+			badgeTitle: "Active soul: {name}",
 		};
 
 		const styles = {
@@ -360,6 +364,80 @@ window.__ModuleLoader__.load({
 							react.createElement("p", { style: { ...styles.msg, ...(result.kind === "ok" ? styles.ok : styles.err) } }, result.text))));
 		}
 
+
+		/** Sidebar footer badge: the active soul's face, always visible. */
+		function ActiveSoulBadge({ ctx, wide }) {
+			const [soul, setSoul] = react.useState(null); // { name, avatar } | null
+			const [avatarSrc, setAvatarSrc] = react.useState(null);
+			const t = ctx.locale.bind(NS);
+			const [, forceRender] = react.useReducer((x) => x + 1, 0);
+			react.useEffect(() => ctx.locale.subscribe(() => forceRender()), [ctx]);
+
+			const refresh = () => {
+				fetch(API + "/list", {
+					method: "POST",
+					credentials: "same-origin",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({})
+				}).then((r) => r.json()).then((data) => {
+					const active = (data.souls || []).find((s) => s.active) || null;
+					setSoul(active);
+					if (active && active.avatar) {
+						return fetch(API + "/avatar", {
+							method: "POST",
+							credentials: "same-origin",
+							headers: { "content-type": "application/json" },
+							body: JSON.stringify({ name: active.name })
+						}).then((r) => r.blob()).then((blob) => {
+							setAvatarSrc(URL.createObjectURL(blob));
+						}).catch(() => setAvatarSrc(null));
+					}
+					setAvatarSrc(null);
+					return null;
+				}).catch(() => {});
+			};
+			react.useEffect(() => { refresh(); const iv = setInterval(refresh, 30000); return () => clearInterval(iv); }, []);
+
+			const badgeStyle = {
+				display: "flex",
+				alignItems: "center",
+				gap: 8,
+				width: "100%",
+				boxSizing: "border-box",
+				padding: wide ? "8px 10px" : "6px 0",
+				border: 0,
+				background: "none",
+				cursor: "pointer",
+				color: "#1c2024",
+				font: "inherit",
+				textAlign: "left"
+			};
+			const face = {
+				width: wide ? 28 : 22,
+				height: wide ? 28 : 22,
+				borderRadius: "50%",
+				objectFit: "cover",
+				background: "#eef1f5",
+				flex: "none",
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "center",
+				fontSize: 14,
+				color: "#8a94a3"
+			};
+			return react.createElement("button", {
+				type: "button",
+				style: badgeStyle,
+				title: soul ? t("badgeTitle", { name: soul.name }) : t("badgeNoSoul"),
+				onClick: () => { /* future: open soul switcher */ }
+			},
+				avatarSrc !== null
+					? react.createElement("img", { src: avatarSrc, style: face, alt: soul ? soul.name : "" })
+					: react.createElement("div", { style: face }, "🌸"),
+				wide && react.createElement("span", { style: { fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+					soul ? soul.name : t("badgeNoSoul")));
+		}
+
 		function apply(ctx) {
 			const slots = ctx.get("slots");
 			if (slots === void 0) return;
@@ -370,6 +448,11 @@ window.__ModuleLoader__.load({
 			slots.inject("settings.plugin.item", () => slots.register(
 				{ name: "settings.plugin.item", id: "dsh-soul", order: 45, label: "dsh-soul" },
 				() => react.createElement(SoulCard, { ctx })
+			));
+			// The active soul's face, always visible at the sidebar footer.
+			slots.inject("sidebar.footer.action", () => slots.register(
+				{ name: "sidebar.footer.action", id: "dsh-soul-active", order: 10, label: "dsh-soul" },
+				(wide) => react.createElement(ActiveSoulBadge, { ctx, wide })
 			));
 		}
 
