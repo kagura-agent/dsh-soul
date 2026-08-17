@@ -366,7 +366,7 @@ window.__ModuleLoader__.load({
 			if (src !== null) {
 				return react.createElement("img", { src, style: styles.avatar, alt: soul.name });
 			}
-			return react.createElement("div", { style: styles.avatar }, "🌸");
+			return react.createElement("div", { style: styles.avatar }, (soul.name || "?").charAt(0).toUpperCase());
 		}
 
 		function SoulCard({ ctx }) {
@@ -667,7 +667,7 @@ window.__ModuleLoader__.load({
 			},
 				avatarSrc !== null
 					? react.createElement("img", { src: avatarSrc, style: face, alt: soul ? soul.name : "" })
-					: react.createElement("div", { style: face }, "🌸"),
+					: react.createElement("div", { style: face }, (soul ? soul.name : "?").charAt(0).toUpperCase()),
 				wide && react.createElement("span", { style: { fontSize: 14, fontWeight: 400, lineHeight: 22, whiteSpace: "nowrap", overflow: "hidden", color: "#1c2024" } },
 					soul ? soul.name : t("badgeNoSoul")));
 
@@ -697,7 +697,7 @@ window.__ModuleLoader__.load({
 			}, [soul.name, soul.avatar]);
 			const style = { width: 22, height: 22, borderRadius: "50%", objectFit: "cover", background: "#eef1f5", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 };
 			if (src !== null) return react.createElement("img", { src, style, alt: soul.name });
-			return react.createElement("div", { style }, "🌸");
+			return react.createElement("div", { style }, (soul.name || "?").charAt(0).toUpperCase());
 		}
 
 		/** Inline editor section: file tabs + textarea + save, shown under the edited row. */
@@ -759,6 +759,63 @@ window.__ModuleLoader__.load({
 					react.createElement("span", { style: { color: "#8a94a3", fontSize: 12 } }, t("editingHint"))));
 		}
 
+		/** Minimal inline SVG icon system — Lucide-style linear icons, hand-drawn
+		 * paths, zero dependencies (the client bundle has no build step). */
+		function ico(parts, size, color, sw) {
+			return react.createElement("svg", {
+				viewBox: "0 0 24 24",
+				width: size || 16,
+				height: size || 16,
+				fill: "none",
+				stroke: color || "currentColor",
+				strokeWidth: sw || 1.8,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": true
+			}, parts);
+		}
+		function ip(d) { return react.createElement("path", { d }); }
+		function ir(x, y, w, h, rx) { return react.createElement("rect", { x, y, width: w, height: h, rx }); }
+		function ic(cx, cy, r) { return react.createElement("circle", { cx, cy, r }); }
+		function il(x1, y1, x2, y2) { return react.createElement("line", { x1, y1, x2, y2 }); }
+		function ipoly(points) { return react.createElement("polygon", { points }); }
+
+		const ICON = {
+			sparkles: (s, c) => ico([ip("m12 3 1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z")], s, c),
+			heart: (s, c) => ico([ip("M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z")], s, c),
+			book: (s, c) => ico([ip("M4 19.5A2.5 2.5 0 0 1 6.5 17H20"), ip("M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z")], s, c),
+			lightbulb: (s, c) => ico([ip("M9 18h6"), ip("M10 22h4"), ip("M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14")], s, c),
+			pen: (s, c) => ico([ip("M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z")], s, c),
+			flame: (s, c) => ico([ip("M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z")], s, c),
+			sprout: (s, c) => ico([ip("M7 20h10"), ip("M10 20c5.5-2.5.8-6.4 3-10"), ip("M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"), ip("M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z")], s, c),
+			star: (s, c) => ico([ip("m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z")], s, c),
+			zap: (s, c) => ico([ip("M13 2 3 14h9l-1 8 10-12h-9l1-8z")], s, c),
+			library: (s, c) => ico([ip("m16 6 4 14"), ip("M12 6v14"), ip("M8 8v12"), ip("M4 4v16")], s, c),
+			gem: (s, c) => ico([ip("M6 3h12l4 6-10 13L2 9Z"), ip("M11 3 8 9l4 13 4-13-3-6"), ip("M2 9h20")], s, c),
+			cake: (s, c) => ico([ip("M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"), ip("M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"), ip("M2 21h20"), ip("M7 8v3"), ip("M12 8v3"), ip("M17 8v3"), ip("M7 4h.01"), ip("M12 4h.01"), ip("M17 4h.01")], s, c),
+			lock: (s, c) => ico([ir(3, 11, 18, 11, 2), ip("M7 11V7a5 5 0 0 1 10 0v4")], s, c),
+			calendar: (s, c) => ico([ir(3, 4, 18, 18, 2), il(16, 2, 16, 6), il(8, 2, 8, 6), il(3, 10, 21, 10)], s, c),
+			clock: (s, c) => ico([ic(12, 12, 10), ip("M12 6v6l4 2")], s, c),
+			bookOpen: (s, c) => ico([ip("M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"), ip("M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z")], s, c),
+			logIn: (s, c) => ico([ip("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"), ip("m10 17 5-5-5-5"), ip("M15 12H3")], s, c),
+			notebook: (s, c) => ico([ip("M2 6h4"), ip("M2 10h4"), ip("M2 14h4"), ip("M2 18h4"), ir(4, 2, 16, 20, 2), ip("M16 2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2")], s, c),
+		};
+		/** Milestone key → icon factory (replaces emoji in the wall). */
+		const MS_ICON = {
+			born: ICON.sparkles,
+			met: ICON.heart,
+			firstNote: ICON.book,
+			firstBelief: ICON.lightbulb,
+			firstEvolve: ICON.pen,
+			week: ICON.flame,
+			month: ICON.sprout,
+			grad: ICON.star,
+			evolve3: ICON.zap,
+			notes100: ICON.library,
+			beliefs100: ICON.gem,
+			anniv: ICON.cake,
+		};
+
 		/** i18n keys for milestone name / condition (milestone key → "msName*"). */
 		function msNameKey(k) { return "msName" + k.charAt(0).toUpperCase() + k.slice(1); }
 		function msCondKey(k) { return "msCond" + k.charAt(0).toUpperCase() + k.slice(1); }
@@ -809,23 +866,30 @@ window.__ModuleLoader__.load({
 			// --- ① soul card: avatar, name, Lv badge, XP bar, summary -----------
 			const lvPct = lv.maxed ? 100 : Math.round((lv.into / Math.max(1, lv.need)) * 100);
 			const avatarEl = avatarUrl
-				? react.createElement("img", { src: avatarUrl, alt: data.name, style: { width: 44, height: 44, borderRadius: "50%", objectFit: "cover", flex: "none", background: "#eef1f5" } })
-				: react.createElement("div", { style: { width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg,#e8f0fe,#f0f4f9)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flex: "none" } }, "🌸");
-			const soulCard = react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", border: "1px solid #e4e8ee", borderRadius: 12, background: "linear-gradient(135deg,#f5f9ff 0%,#fff 60%)" } },
+				? react.createElement("img", { src: avatarUrl, alt: data.name, style: { width: 46, height: 46, borderRadius: "50%", objectFit: "cover", flex: "none", background: "#eef1f5", boxShadow: "0 0 0 2px #fff, 0 0 0 4px #dbe7fb" } })
+				: react.createElement("div", { style: { width: 46, height: 46, borderRadius: "50%", background: "linear-gradient(135deg,#dbe7fb,#f0f4f9)", color: "#1f6feb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, flex: "none" } }, (data.name || "?").charAt(0).toUpperCase());
+			const statChip = (icon, text) => react.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5, color: "#5a6472", fontSize: 11.5, whiteSpace: "nowrap" } }, icon, text);
+			const xpText = lv.maxed ? t("levelMax") : t("xpToNext", { n: lv.level + 1, xp: lv.need - lv.into });
+			const soulCard = react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: "1px solid #e4e8ee", borderRadius: 14, background: "linear-gradient(135deg,#f7faff 0%,#ffffff 55%)", boxShadow: "0 1px 2px rgba(16,24,40,.05)" } },
 				avatarEl,
-				react.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 } },
-					react.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8 } },
-						react.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#1c2024" } }, data.name),
-						react.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#1f6feb", background: "#e8f0fe", borderRadius: 8, padding: "1px 7px", fontVariantNumeric: "tabular-nums" } }, t("level", { n: lv.level }))),
+				react.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 } },
 					react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-						react.createElement("div", { style: { flex: 1, height: 8, borderRadius: 4, background: "#e8eef5", overflow: "hidden" } },
-							react.createElement("div", { style: { width: lvPct + "%", height: "100%", borderRadius: 4, background: "linear-gradient(90deg,#1f6feb,#58a6ff)" } })),
-						react.createElement("span", { style: { fontSize: 11, color: "#5a6472", whiteSpace: "nowrap" } },
-							lv.maxed ? t("levelMax") : t("xpToNext", { n: lv.level + 1, xp: lv.need - lv.into }))),
-					react.createElement("div", { style: { fontSize: 11.5, color: "#5a6472" } },
-						"🎂 " + born + " · " + t("growthDays") + " " + (days !== null ? String(days) : "—") + " · " + t("growthNotes") + " " + String(data.notesCount || 0) + " · " + t("xpTotal", { total: xp.total })),
+						react.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#1c2024", letterSpacing: "-.01em" } }, data.name),
+						react.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: "#fff", background: "linear-gradient(135deg,#1f6feb,#3d8bfd)", borderRadius: 9, padding: "2px 9px", boxShadow: "0 1px 3px rgba(31,111,235,.35)", fontVariantNumeric: "tabular-nums", letterSpacing: ".02em" } }, t("level", { n: lv.level }))),
+					react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
+						react.createElement("div", { style: { flex: 1, height: 10, borderRadius: 5, background: "#e8eef5", overflow: "hidden" } },
+							react.createElement("div", { style: { width: lvPct + "%", height: "100%", borderRadius: 5, background: "linear-gradient(90deg,#1f6feb 0%,#58a6ff 100%)", position: "relative" } },
+								lvPct > 0 ? react.createElement("div", { style: { position: "absolute", right: 2, top: 2, bottom: 2, width: 3, borderRadius: 2, background: "rgba(255,255,255,.7)" } }) : null)),
+						react.createElement("span", { style: { fontSize: 11, color: "#5a6472", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" } }, xpText)),
+					react.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 } },
+						statChip(ICON.calendar(13), born),
+						statChip(ICON.clock(13), t("growthDays") + " " + (days !== null ? String(days) : "—")),
+						statChip(ICON.book(13), t("growthNotes") + " " + String(data.notesCount || 0)),
+						statChip(ICON.star(13, "#d97706"), t("xpTotal", { total: xp.total }))),
 					...(streak.max > 0
-						? [react.createElement("div", { style: { fontSize: 11, color: "#8a94a3" } }, "🔥 " + t("streakLine", { current: streak.current, max: streak.max }))]
+						? [react.createElement("div", { style: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "#c2410c", background: "#fff4ed", border: "1px solid #fed7aa", borderRadius: 999, padding: "2px 9px", alignSelf: "flex-start", fontWeight: 600 } },
+							ICON.flame(13, "#ea580c"),
+							t("streakLine", { current: streak.current, max: streak.max }))]
 						: [])));
 
 			// --- ② stat radar (Pokémon summary page language) -------------------
@@ -837,26 +901,34 @@ window.__ModuleLoader__.load({
 				{ key: "focus", label: t("statFocus") },
 				{ key: "belief", label: t("statBelief") },
 			];
-			const RADAR_W = 220;
-			const RADAR_H = 200;
-			const RCX = 110;
-			const RCY = 92;
-			const RR = 64;
+			const RADAR_W = 232;
+			const RADAR_H = 208;
+			const RCX = 116;
+			const RCY = 96;
+			const RR = 66;
 			const rpt = (i, v) => {
 				const a = (Math.PI * 2 * i) / 6 - Math.PI / 2;
 				const rr = (Math.max(0, Math.min(100, v)) / 100) * RR;
 				return [RCX + rr * Math.cos(a), RCY + rr * Math.sin(a)];
 			};
 			const rpoly = (scale) => dims.map((_, i) => rpt(i, scale).map(Math.round).join(",")).join(" ");
-			const radar = react.createElement("svg", { viewBox: "0 0 " + RADAR_W + " " + RADAR_H, style: { width: "100%", maxWidth: 260 } },
-				[25, 50, 75, 100].map((s) => react.createElement("polygon", { key: "g" + s, points: rpoly(s), fill: "none", stroke: "#e4e8ee", strokeWidth: 1 })),
-				dims.map((_, i) => react.createElement("line", { key: "a" + i, x1: RCX, y1: RCY, x2: rpt(i, 100)[0], y2: rpt(i, 100)[1], stroke: "#e4e8ee", strokeWidth: 1 })),
-				react.createElement("polygon", { points: dims.map((d, i) => rpt(i, stats[d.key] || 0).map(Math.round).join(",")).join(" "), fill: "rgba(31,111,235,.16)", stroke: "#1f6feb", strokeWidth: 1.5, strokeLinejoin: "round" }),
-				dims.map((d, i) => react.createElement("text", { key: "v" + i, x: rpt(i, 78)[0], y: rpt(i, 78)[1], textAnchor: "middle", dominantBaseline: "middle", fontSize: 9, fontWeight: 600, fill: "#1f6feb" }, String(stats[d.key] || 0))),
+			const radar = react.createElement("svg", { viewBox: "0 0 " + RADAR_W + " " + RADAR_H, style: { width: "100%", maxWidth: 268 } },
+				react.createElement("defs", null,
+					react.createElement("radialGradient", { id: "radarFill", cx: "50%", cy: "50%", r: "65%" },
+						react.createElement("stop", { offset: "0%", stopColor: "#1f6feb", stopOpacity: 0.24 }),
+						react.createElement("stop", { offset: "100%", stopColor: "#1f6feb", stopOpacity: 0.04 }))),
+				[33, 66, 100].map((s) => react.createElement("polygon", { key: "g" + s, points: rpoly(s), fill: "none", stroke: "#e8edf3", strokeWidth: 1 })),
+				dims.map((_, i) => react.createElement("line", { key: "a" + i, x1: RCX, y1: RCY, x2: rpt(i, 100)[0], y2: rpt(i, 100)[1], stroke: "#eef1f5", strokeWidth: 1 })),
+				react.createElement("polygon", { points: dims.map((d, i) => rpt(i, stats[d.key] || 0).map(Math.round).join(",")).join(" "), fill: "url(#radarFill)", stroke: "#1f6feb", strokeWidth: 1.8, strokeLinejoin: "round" }),
 				dims.map((d, i) => {
-					const lx = rpt(i, 122)[0];
-					const ly = rpt(i, 122)[1];
-					return react.createElement("text", { key: "l" + i, x: lx, y: ly, textAnchor: "middle", dominantBaseline: "middle", fontSize: 10, fill: "#5a6472" }, d.label);
+					const vx = rpt(i, stats[d.key] || 0)[0];
+					const vy = rpt(i, stats[d.key] || 0)[1];
+					return react.createElement("circle", { key: "v" + i, cx: vx, cy: vy, r: 2.6, fill: "#fff", stroke: "#1f6feb", strokeWidth: 1.8 });
+				}),
+				dims.map((d, i) => {
+					const nx = rpt(i, 118)[0];
+					const ny = rpt(i, 118)[1];
+					return react.createElement("text", { key: "l" + i, x: nx, y: ny, textAnchor: "middle", dominantBaseline: "middle", fontSize: 10.5, fill: "#5a6472", fontWeight: 500 }, d.label);
 				}));
 
 			// --- ③ growth curve: cumulative XP with milestone ★ -----------------
@@ -874,49 +946,65 @@ window.__ModuleLoader__.load({
 				const ys = cumulative.map((c) => H - PB - (c.xp / maxXp) * (H - PT - PB));
 				const line = cumulative.map((c, i) => xs[i] + "," + ys[i]).join(" ");
 				const area = line + " " + xs[n - 1] + "," + (H - PB) + " " + xs[0] + "," + (H - PB);
-				const stars = milestones.filter((ms) => ms.achieved && ms.date).map((ms) => {
+				const endX = xs[n - 1];
+				const endY = ys[n - 1];
+				const marks = milestones.filter((ms) => ms.achieved && ms.date).map((ms) => {
 					const idx = cumulative.findIndex((c) => c.month === ms.date.slice(0, 7));
-					return idx >= 0
-						? react.createElement("text", { key: "st" + ms.key, x: xs[idx], y: ys[idx] - 9, textAnchor: "middle", fontSize: 12, title: t(msNameKey(ms.key)) }, ms.icon)
-						: null;
+					if (idx < 0) return null;
+					return react.createElement("g", { key: "st" + ms.key },
+						react.createElement("line", { x1: xs[idx], y1: ys[idx] - 14, x2: xs[idx], y2: ys[idx] + 2, stroke: "#f6c344", strokeWidth: 1.5, strokeDasharray: "2 2" }),
+						react.createElement("circle", { cx: xs[idx], cy: ys[idx], r: 3, fill: "#f6c344", stroke: "#fff", strokeWidth: 1.5 }));
 				}).filter(Boolean);
 				const ticks = [0, Math.round(maxXp / 2), maxXp].map((v, i) => {
 					const y = H - PB - (v / maxXp) * (H - PT - PB);
-					return react.createElement("text", { key: "tk" + i, x: PL - 6, y: y + 3, textAnchor: "end", fontSize: 9, fill: "#8a94a3" }, String(v));
+					return react.createElement("text", { key: "tk" + i, x: PL - 6, y: y + 3, textAnchor: "end", fontSize: 9, fill: "#9aa3b0", fontVariantNumeric: "tabular-nums" }, String(v));
+				});
+				const gridLines = [0.5].map((f) => {
+					const y = H - PB - f * (H - PT - PB);
+					return react.createElement("line", { key: "gl", x1: PL, y1: y, x2: W - PR, y2: y, stroke: "#f1f3f6", strokeWidth: 1, strokeDasharray: "3 3" });
 				});
 				curve = react.createElement("svg", { viewBox: "0 0 " + W + " " + H, style: { width: "100%", maxWidth: 560 } },
 					ticks,
-					react.createElement("polygon", { points: area, fill: "rgba(31,111,235,.08)" }),
-					react.createElement("polyline", { points: line, fill: "none", stroke: "#1f6feb", strokeWidth: 2, strokeLinejoin: "round" }),
-					...stars,
-					react.createElement("text", { x: xs[0], y: H - 6, fontSize: 9, fill: "#8a94a3" }, cumulative[0].month),
-					n > 1 ? react.createElement("text", { x: xs[n - 1], y: H - 6, textAnchor: "end", fontSize: 9, fill: "#8a94a3" }, cumulative[n - 1].month) : null);
+					gridLines,
+					react.createElement("defs", null,
+						react.createElement("linearGradient", { id: "curveFill", x1: "0", y1: "0", x2: "0", y2: "1" },
+							react.createElement("stop", { offset: "0%", stopColor: "#1f6feb", stopOpacity: 0.16 }),
+							react.createElement("stop", { offset: "100%", stopColor: "#1f6feb", stopOpacity: 0.02 }))),
+					react.createElement("polygon", { points: area, fill: "url(#curveFill)" }),
+					react.createElement("polyline", { points: line, fill: "none", stroke: "#1f6feb", strokeWidth: 2.2, strokeLinejoin: "round", strokeLinecap: "round" }),
+					...marks,
+					react.createElement("circle", { cx: endX, cy: endY, r: 4, fill: "#1f6feb", stroke: "#fff", strokeWidth: 2 }),
+					react.createElement("text", { x: xs[0], y: H - 6, fontSize: 9, fill: "#9aa3b0" }, cumulative[0].month),
+					n > 1 ? react.createElement("text", { x: xs[n - 1], y: H - 6, textAnchor: "end", fontSize: 9, fill: "#9aa3b0" }, cumulative[n - 1].month) : null);
 			}
 
 			// --- ④ milestone wall: unlocked cards + ghost cards -----------------
-			const wall = react.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+			const wall = react.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap" } },
 				milestones.map((ms) => {
 					const name = t(msNameKey(ms.key));
 					const cond = t(msCondKey(ms.key));
+					const mkIcon = MS_ICON[ms.key] || ICON.sparkles;
 					if (ms.achieved) {
-						return react.createElement("div", { key: ms.key, title: cond, style: { flex: "0 0 126px", padding: "8px 10px", border: "1px solid #dbe7fb", borderRadius: 10, background: "#f5f9ff", display: "flex", flexDirection: "column", gap: 3 } },
-							react.createElement("div", { style: { fontSize: 16 } }, ms.icon),
-							react.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#1c2024" } }, name),
-							ms.date ? react.createElement("div", { style: { fontSize: 10.5, color: "#1f6feb", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" } }, ms.date) : null);
+						return react.createElement("div", { key: ms.key, title: cond, style: { flex: "0 0 132px", padding: "10px 12px 9px", border: "1px solid #e8edf3", borderRadius: 12, background: "#fff", display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 2px rgba(16,24,40,.04)" } },
+							react.createElement("div", { style: { width: 34, height: 34, borderRadius: 9, background: "#eef4ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#1f6feb" } }, mkIcon(17)),
+							react.createElement("div", { style: { fontSize: 12.5, fontWeight: 600, color: "#1c2024", lineHeight: 1.25 } }, name),
+							ms.date ? react.createElement("div", { style: { fontSize: 10.5, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontVariantNumeric: "tabular-nums" } }, ms.date) : null);
 					}
-					return react.createElement("div", { key: ms.key, title: cond, style: { flex: "0 0 126px", padding: "8px 10px", border: "1px dashed #d4d9e0", borderRadius: 10, background: "#fafbfc", display: "flex", flexDirection: "column", gap: 3, color: "#9aa3b0" } },
-						react.createElement("div", { style: { fontSize: 16, filter: "grayscale(1)", opacity: 0.5 } }, ms.icon),
-						react.createElement("div", { style: { fontSize: 12, fontWeight: 600 } }, "🔒 " + name),
+					return react.createElement("div", { key: ms.key, title: cond, style: { flex: "0 0 132px", padding: "10px 12px 9px", border: "1px dashed #d8dee6", borderRadius: 12, background: "#fafbfc", display: "flex", flexDirection: "column", gap: 6, color: "#9aa3b0" } },
+						react.createElement("div", { style: { position: "relative", width: 34, height: 34, borderRadius: 9, background: "#f0f2f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#a8b0bc" } },
+							mkIcon(17),
+							react.createElement("div", { style: { position: "absolute", right: -3, bottom: -3, width: 15, height: 15, borderRadius: 8, background: "#fff", border: "1px solid #d8dee6", display: "flex", alignItems: "center", justifyContent: "center", color: "#9aa3b0" } }, ICON.lock(9))),
+						react.createElement("div", { style: { fontSize: 12.5, fontWeight: 600, lineHeight: 1.25 } }, name),
 						react.createElement("div", { style: { fontSize: 10.5, lineHeight: 1.4 } }, cond));
 				}));
 
 			// --- timeline: milestones (born, migrate, dna edits) -----------------
 			const tl = [];
-			tl.push({ key: "born", date: born, icon: "🎂", label: t("growthEventBorn") });
+			tl.push({ key: "born", date: born, icon: ICON.sparkles(13, "#1f6feb"), label: t("growthEventBorn") });
 			if (m.createdAt && m.createdAt.slice(0, 10) !== born) {
-				tl.push({ key: "migrate", date: m.createdAt.slice(0, 10), icon: "🚀", label: t("growthEventMigrate") });
+				tl.push({ key: "migrate", date: m.createdAt.slice(0, 10), icon: ICON.logIn(13, "#5a6472"), label: t("growthEventMigrate") });
 			}
-			dna.forEach((c, i) => tl.push({ key: "dna" + i, date: (c.ts || "").slice(0, 10), icon: "✏️", label: t("growthEventDna", { file: c.file }) }));
+			dna.forEach((c, i) => tl.push({ key: "dna" + i, date: (c.ts || "").slice(0, 10), icon: ICON.pen(13, "#5a6472"), label: t("growthEventDna", { file: c.file }) }));
 			tl.sort((a, b) => a.date.localeCompare(b.date));
 
 			return react.createElement("div", { style: { flex: 1, minHeight: 0, padding: "14px 20px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 } },
@@ -929,17 +1017,18 @@ window.__ModuleLoader__.load({
 				// --- ③ growth curve ----------------------------------------------
 				...(curve
 					? [sectionTitle(t("curveTitle")),
-						react.createElement("div", { style: { border: "1px solid #e4e8ee", borderRadius: 10, background: "#fff", padding: "10px 12px" } },
+						react.createElement("div", { style: { border: "1px solid #e8edf3", borderRadius: 12, background: "#fff", padding: "10px 12px", boxShadow: "0 1px 2px rgba(16,24,40,.04)" } },
 							curve,
-							react.createElement("div", { style: { fontSize: 10.5, color: "#8a94a3", marginTop: 2 } }, "※ " + t("curveNote")))]
+							react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, color: "#9aa3b0", marginTop: 2 } }, ICON.bookOpen(12), t("curveNote")))]
 					: []),
 				// --- ④ milestone wall --------------------------------------------
 				sectionTitle(t("msTitle") + " · " + t("msDone", { n: milestones.filter((x) => x.achieved).length })),
 				wall,
 				// --- record span line --------------------------------------------
 				...(data.notesSpan
-					? [react.createElement("div", { style: { fontSize: 12, color: "#8a94a3" } },
-						"🗓 " + t("growthSpan", { first: data.notesSpan.first, last: data.notesSpan.last }))]
+					? [react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#8a94a3" } },
+						ICON.calendar(13),
+						t("growthSpan", { first: data.notesSpan.first, last: data.notesSpan.last }))]
 					: []),
 				// --- timeline -----------------------------------------------------
 				sectionTitle(t("growthTimeline")),
@@ -947,28 +1036,28 @@ window.__ModuleLoader__.load({
 					? react.createElement("div", { style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoEvents"))
 					: react.createElement("div", { style: { display: "flex", flexDirection: "column" } },
 						tl.map((ev, i) => react.createElement("div", { key: ev.key, style: { display: "flex", gap: 10, position: "relative", padding: "0 0 10px 18px" } },
-							react.createElement("div", { style: { position: "absolute", left: 0, top: 3, width: 9, height: 9, borderRadius: "50%", background: i === 0 ? "#1f6feb" : "#c9d1dc" } }),
-							i < tl.length - 1 ? react.createElement("div", { style: { position: "absolute", left: 4, top: 14, bottom: 0, width: 1, background: "#e4e8ee" } }) : null,
-							react.createElement("span", { style: { flex: "none", width: 84, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 1 } }, ev.date),
-							react.createElement("span", { style: { fontSize: 12.5, color: "#1c2024" } }, ev.icon + " " + ev.label)))),
+							react.createElement("div", { style: { position: "absolute", left: 0, top: 4, width: 9, height: 9, borderRadius: "50%", background: i === 0 ? "#1f6feb" : "#c9d1dc", boxShadow: i === 0 ? "0 0 0 3px rgba(31,111,235,.15)" : "none" } }),
+							i < tl.length - 1 ? react.createElement("div", { style: { position: "absolute", left: 4, top: 16, bottom: 0, width: 1, background: "#e8edf3" } }) : null,
+							react.createElement("span", { style: { flex: "none", width: 84, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 2, fontVariantNumeric: "tabular-nums" } }, ev.date),
+							react.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, color: "#1c2024", paddingTop: 1 } }, ev.icon, react.createElement("span", null, ev.label)))),
 				// --- recent notes -------------------------------------------------
 				sectionTitle(t("growthSectionNotes")),
 				...(notes.length === 0
 					? [react.createElement("div", { key: "nonotes", style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoNotes"))]
 					: notes.map((n, i) => react.createElement("div", { key: "note" + i, style: { display: "flex", gap: 10, padding: "6px 0", borderBottom: "1px solid #f1f3f6", alignItems: "flex-start" } },
-						react.createElement("span", { style: { flex: "none", width: 84, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 1 } }, n.date || ""),
+						react.createElement("span", { style: { flex: "none", width: 84, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 2, fontVariantNumeric: "tabular-nums" } }, n.date || ""),
 						react.createElement("div", { style: { minWidth: 0, flex: 1 } },
-							react.createElement("div", { style: { fontSize: 12, color: "#1c2024" } }, "📓 " + (n.name || "")),
-							n.preview ? react.createElement("div", { style: { fontSize: 11.5, color: "#8a94a3", marginTop: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, n.preview) : null)))),
+							react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#1c2024" } }, ICON.book(13, "#1f6feb"), react.createElement("span", null, n.name || "")),
+							n.preview ? react.createElement("div", { style: { fontSize: 11.5, color: "#8a94a3", marginTop: 2, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, n.preview) : null)))),
 				// --- recent beliefs ------------------------------------------------
 				sectionTitle(t("growthSectionBeliefs")),
 				...(beliefs.length === 0
 					? [react.createElement("div", { key: "nobeliefs", style: { color: "#8a94a3", fontSize: 12 } }, t("growthNoBeliefs"))]
 					: beliefs.map((b, i) => react.createElement("div", { key: "belief" + i, style: { display: "flex", gap: 10, padding: "6px 0", borderBottom: "1px solid #f1f3f6", alignItems: "flex-start" } },
-						react.createElement("span", { style: { flex: "none", width: 84, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 1 } }, b.date || ""),
+						react.createElement("span", { style: { flex: "none", width: 84, fontSize: 11, color: "#8a94a3", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", paddingTop: 2, fontVariantNumeric: "tabular-nums" } }, b.date || ""),
 						react.createElement("div", { style: { minWidth: 0, flex: 1 } },
-							react.createElement("div", { style: { fontSize: 12, color: "#1c2024" } }, "💡 " + t("growthEventBelief", { date: b.date || "" })),
-							b.text ? react.createElement("div", { style: { fontSize: 11.5, color: "#5a6472", marginTop: 2, whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.5 } }, b.text) : null)))));
+							react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#1c2024" } }, ICON.lightbulb(13, "#d97706"), react.createElement("span", null, t("growthEventBelief", { date: b.date || "" }))),
+							b.text ? react.createElement("div", { style: { fontSize: 11.5, color: "#5a6472", marginTop: 2, whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.5 } }, b.text) : null))))));
 		}
 
 		/** Large soul-config modal: the soul list on the left (each row with an
