@@ -75,6 +75,49 @@ window.__ModuleLoader__.load({
 			growthNoDna: "还没有修改过 DNA",
 			growthNoNotes: "还没有日记",
 			growthNoBeliefs: "还没有候选教训",
+			// --- growth: raising-sim layer (docs/growth-design.md) ---
+			level: "Lv.{n}",
+			levelMax: "满级",
+			xpToNext: "距 Lv.{n} 还差 {xp} 经验",
+			xpTotal: "累计经验 {total}",
+			xpRule: "日记 +10 · 信念 +20 · DNA 修改 +50 · 毕业 +100",
+			statTitle: "属性",
+			statTogether: "陪伴",
+			statRecord: "记录",
+			statReflect: "反思",
+			statEvolve: "进化",
+			statFocus: "专注",
+			statBelief: "信念",
+			streakLine: "连续记录 {current} 天 · 最长 {max} 天",
+			curveTitle: "成长曲线",
+			curveNote: "日记经验累计",
+			msTitle: "里程碑",
+			msDone: "已解锁 {n}",
+			msLocked: "未解锁",
+			msNameBorn: "出生",
+			msNameMet: "与你相遇",
+			msNameFirstNote: "第一篇日记",
+			msNameFirstBelief: "第一条信念",
+			msNameFirstEvolve: "第一次进化",
+			msNameWeek: "坚持一周",
+			msNameMonth: "满月",
+			msNameGrad: "信念毕业",
+			msNameEvolve3: "三次进化",
+			msNameNotes100: "百篇记录",
+			msNameBeliefs100: "百条信念",
+			msNameAnniv: "周年",
+			msCondBorn: "最早记录的日期",
+			msCondMet: "激活或迁移到 DSH",
+			msCondFirstNote: "写下第 1 篇日记",
+			msCondFirstBelief: "记录第 1 条候选教训",
+			msCondFirstEvolve: "第 1 次修改 DNA",
+			msCondWeek: "连续 7 天写日记",
+			msCondMonth: "陪伴满 30 天",
+			msCondGrad: "第 1 条信念毕业",
+			msCondEvolve3: "累计 3 次 DNA 修改",
+			msCondNotes100: "写满 100 篇日记",
+			msCondBeliefs100: "积累 100 条候选教训",
+			msCondAnniv: "陪伴满 365 天",
 			save: "保存",
 			editingHint: "保存后自动重新聚合到 ~/.dsh/AGENTS.md",
 			saved: "已保存 {file}",
@@ -142,6 +185,49 @@ window.__ModuleLoader__.load({
 			growthNoDna: "No DNA edits yet",
 			growthNoNotes: "No notes yet",
 			growthNoBeliefs: "No belief candidates yet",
+			// --- growth: raising-sim layer (docs/growth-design.md) ---
+			level: "Lv.{n}",
+			levelMax: "Maxed",
+			xpToNext: "{xp} XP to Lv.{n}",
+			xpTotal: "{total} total XP",
+			xpRule: "note +10 · belief +20 · DNA edit +50 · graduation +100",
+			statTitle: "Stats",
+			statTogether: "Together",
+			statRecord: "Record",
+			statReflect: "Reflect",
+			statEvolve: "Evolve",
+			statFocus: "Focus",
+			statBelief: "Belief",
+			streakLine: "{current}-day streak · best {max}",
+			curveTitle: "Growth curve",
+			curveNote: "cumulative note XP",
+			msTitle: "Milestones",
+			msDone: "{n} unlocked",
+			msLocked: "locked",
+			msNameBorn: "Born",
+			msNameMet: "Met you",
+			msNameFirstNote: "First note",
+			msNameFirstBelief: "First belief",
+			msNameFirstEvolve: "First evolve",
+			msNameWeek: "One week",
+			msNameMonth: "First month",
+			msNameGrad: "Belief graduated",
+			msNameEvolve3: "Evolved ×3",
+			msNameNotes100: "100 notes",
+			msNameBeliefs100: "100 beliefs",
+			msNameAnniv: "Anniversary",
+			msCondBorn: "date of the earliest record",
+			msCondMet: "activated or migrated to DSH",
+			msCondFirstNote: "write the 1st daily note",
+			msCondFirstBelief: "log the 1st belief candidate",
+			msCondFirstEvolve: "make the 1st DNA edit",
+			msCondWeek: "7 consecutive days with notes",
+			msCondMonth: "30 days together",
+			msCondGrad: "1st belief graduates",
+			msCondEvolve3: "3 DNA edits total",
+			msCondNotes100: "100 daily notes",
+			msCondBeliefs100: "100 belief candidates",
+			msCondAnniv: "365 days together",
 			save: "Save",
 			editingHint: "Saving re-aggregates into ~/.dsh/AGENTS.md automatically",
 			saved: "Saved {file}",
@@ -673,9 +759,14 @@ window.__ModuleLoader__.load({
 					react.createElement("span", { style: { color: "#8a94a3", fontSize: 12 } }, t("editingHint"))));
 		}
 
-		/** Growth view: the soul's life story — stat cards, a monthly activity
-		 * chart (the growth curve), a timeline of milestones, then recent notes
-		 * and belief candidates. */
+		/** i18n keys for milestone name / condition (milestone key → "msName*"). */
+		function msNameKey(k) { return "msName" + k.charAt(0).toUpperCase() + k.slice(1); }
+		function msCondKey(k) { return "msCond" + k.charAt(0).toUpperCase() + k.slice(1); }
+
+		/** Growth view: the soul's life story — soul card with level + XP bar,
+		 * a six-dimension stat radar, the cumulative growth curve, a milestone
+		 * wall (unlocked + ghost cards), then timeline, recent notes and belief
+		 * candidates. Raising-sim feel, all numbers from real events. */
 		function GrowthView({ data, t }) {
 			if (data === null) {
 				return react.createElement("div", { style: { color: "#8a94a3", fontSize: 12 } }, t("busy"));
@@ -687,16 +778,137 @@ window.__ModuleLoader__.load({
 				const start = new Date(born).getTime();
 				if (!Number.isNaN(start)) days = Math.max(1, Math.floor((Date.now() - start) / 86400000) + 1);
 			}
+			const g = data.growth || {};
+			const lv = g.level || { level: 1, into: 0, need: 100 };
+			const xp = g.xp || { total: 0 };
+			const stats = g.stats || {};
+			const streak = g.streak || { current: 0, max: 0 };
+			const milestones = g.milestones || [];
+			const cumulative = g.cumulative || [];
 			const dna = (m.dnaChanges || []).slice().reverse();
 			const notes = data.notes || [];
 			const beliefs = data.beliefsRecent || [];
-			const monthly = data.monthly || [];
-			const maxCount = Math.max(1, ...monthly.map((x) => x.count));
 
-			const card = (label, value, accent) => react.createElement("div", { style: { flex: "1 1 110px", minWidth: 100, padding: "10px 12px", border: "1px solid #e4e8ee", borderRadius: 10, background: "#fff", display: "flex", flexDirection: "column", gap: 2 } },
-				react.createElement("span", { style: { fontSize: 11, color: "#8a94a3" } }, label),
-				react.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: accent || "#1c2024", fontVariantNumeric: "tabular-nums" } }, value));
+			// avatar bytes → object URL (GrowthView owns its fetch lifecycle)
+			const [avatarUrl, setAvatarUrl] = react.useState(null);
+			react.useEffect(() => {
+				let cancelled = false;
+				if (!data.avatar) { setAvatarUrl(null); return undefined; }
+				fetch(API + "/avatar", {
+					method: "POST", credentials: "same-origin",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ name: data.name })
+				}).then((res) => (res.ok ? res.blob() : null))
+					.then((blob) => { if (!cancelled && blob) setAvatarUrl(URL.createObjectURL(blob)); })
+					.catch(() => { /* keep placeholder */ });
+				return () => { cancelled = true; };
+			}, [data.avatar, data.name]);
+
 			const sectionTitle = (text) => react.createElement("div", { style: { fontWeight: 600, color: "#1c2024", fontSize: 13, marginTop: 6 } }, text);
+
+			// --- ① soul card: avatar, name, Lv badge, XP bar, summary -----------
+			const lvPct = lv.maxed ? 100 : Math.round((lv.into / Math.max(1, lv.need)) * 100);
+			const avatarEl = avatarUrl
+				? react.createElement("img", { src: avatarUrl, alt: data.name, style: { width: 44, height: 44, borderRadius: "50%", objectFit: "cover", flex: "none", background: "#eef1f5" } })
+				: react.createElement("div", { style: { width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg,#e8f0fe,#f0f4f9)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flex: "none" } }, "🌸");
+			const soulCard = react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", border: "1px solid #e4e8ee", borderRadius: 12, background: "linear-gradient(135deg,#f5f9ff 0%,#fff 60%)" } },
+				avatarEl,
+				react.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 } },
+					react.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8 } },
+						react.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#1c2024" } }, data.name),
+						react.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#1f6feb", background: "#e8f0fe", borderRadius: 8, padding: "1px 7px", fontVariantNumeric: "tabular-nums" } }, t("level", { n: lv.level }))),
+					react.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
+						react.createElement("div", { style: { flex: 1, height: 8, borderRadius: 4, background: "#e8eef5", overflow: "hidden" } },
+							react.createElement("div", { style: { width: lvPct + "%", height: "100%", borderRadius: 4, background: "linear-gradient(90deg,#1f6feb,#58a6ff)" } })),
+						react.createElement("span", { style: { fontSize: 11, color: "#5a6472", whiteSpace: "nowrap" } },
+							lv.maxed ? t("levelMax") : t("xpToNext", { n: lv.level + 1, xp: lv.need - lv.into }))),
+					react.createElement("div", { style: { fontSize: 11.5, color: "#5a6472" } },
+						"🎂 " + born + " · " + t("growthDays") + " " + (days !== null ? String(days) : "—") + " · " + t("growthNotes") + " " + String(data.notesCount || 0) + " · " + t("xpTotal", { total: xp.total })),
+					...(streak.max > 0
+						? [react.createElement("div", { style: { fontSize: 11, color: "#8a94a3" } }, "🔥 " + t("streakLine", { current: streak.current, max: streak.max }))]
+						: [])));
+
+			// --- ② stat radar (Pokémon summary page language) -------------------
+			const dims = [
+				{ key: "together", label: t("statTogether") },
+				{ key: "record", label: t("statRecord") },
+				{ key: "reflect", label: t("statReflect") },
+				{ key: "evolve", label: t("statEvolve") },
+				{ key: "focus", label: t("statFocus") },
+				{ key: "belief", label: t("statBelief") },
+			];
+			const RADAR_W = 220;
+			const RADAR_H = 200;
+			const RCX = 110;
+			const RCY = 92;
+			const RR = 64;
+			const rpt = (i, v) => {
+				const a = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+				const rr = (Math.max(0, Math.min(100, v)) / 100) * RR;
+				return [RCX + rr * Math.cos(a), RCY + rr * Math.sin(a)];
+			};
+			const rpoly = (scale) => dims.map((_, i) => rpt(i, scale).map(Math.round).join(",")).join(" ");
+			const radar = react.createElement("svg", { viewBox: "0 0 " + RADAR_W + " " + RADAR_H, style: { width: "100%", maxWidth: 260 } },
+				[25, 50, 75, 100].map((s) => react.createElement("polygon", { key: "g" + s, points: rpoly(s), fill: "none", stroke: "#e4e8ee", strokeWidth: 1 })),
+				dims.map((_, i) => react.createElement("line", { key: "a" + i, x1: RCX, y1: RCY, x2: rpt(i, 100)[0], y2: rpt(i, 100)[1], stroke: "#e4e8ee", strokeWidth: 1 })),
+				react.createElement("polygon", { points: dims.map((d, i) => rpt(i, stats[d.key] || 0).map(Math.round).join(",")).join(" "), fill: "rgba(31,111,235,.16)", stroke: "#1f6feb", strokeWidth: 1.5, strokeLinejoin: "round" }),
+				dims.map((d, i) => react.createElement("text", { key: "v" + i, x: rpt(i, 78)[0], y: rpt(i, 78)[1], textAnchor: "middle", dominantBaseline: "middle", fontSize: 9, fontWeight: 600, fill: "#1f6feb" }, String(stats[d.key] || 0))),
+				dims.map((d, i) => {
+					const lx = rpt(i, 122)[0];
+					const ly = rpt(i, 122)[1];
+					return react.createElement("text", { key: "l" + i, x: lx, y: ly, textAnchor: "middle", dominantBaseline: "middle", fontSize: 10, fill: "#5a6472" }, d.label);
+				}));
+
+			// --- ③ growth curve: cumulative XP with milestone ★ -----------------
+			let curve = null;
+			if (cumulative.length > 0) {
+				const W = 560;
+				const H = 130;
+				const PL = 38;
+				const PR = 14;
+				const PT = 16;
+				const PB = 22;
+				const n = cumulative.length;
+				const maxXp = Math.max(1, ...cumulative.map((c) => c.xp));
+				const xs = cumulative.map((_, i) => PL + (i * (W - PL - PR)) / Math.max(1, n - 1));
+				const ys = cumulative.map((c) => H - PB - (c.xp / maxXp) * (H - PT - PB));
+				const line = cumulative.map((c, i) => xs[i] + "," + ys[i]).join(" ");
+				const area = line + " " + xs[n - 1] + "," + (H - PB) + " " + xs[0] + "," + (H - PB);
+				const stars = milestones.filter((ms) => ms.achieved && ms.date).map((ms) => {
+					const idx = cumulative.findIndex((c) => c.month === ms.date.slice(0, 7));
+					return idx >= 0
+						? react.createElement("text", { key: "st" + ms.key, x: xs[idx], y: ys[idx] - 9, textAnchor: "middle", fontSize: 12, title: t(msNameKey(ms.key)) }, ms.icon)
+						: null;
+				}).filter(Boolean);
+				const ticks = [0, Math.round(maxXp / 2), maxXp].map((v, i) => {
+					const y = H - PB - (v / maxXp) * (H - PT - PB);
+					return react.createElement("text", { key: "tk" + i, x: PL - 6, y: y + 3, textAnchor: "end", fontSize: 9, fill: "#8a94a3" }, String(v));
+				});
+				curve = react.createElement("svg", { viewBox: "0 0 " + W + " " + H, style: { width: "100%", maxWidth: 560 } },
+					ticks,
+					react.createElement("polygon", { points: area, fill: "rgba(31,111,235,.08)" }),
+					react.createElement("polyline", { points: line, fill: "none", stroke: "#1f6feb", strokeWidth: 2, strokeLinejoin: "round" }),
+					...stars,
+					react.createElement("text", { x: xs[0], y: H - 6, fontSize: 9, fill: "#8a94a3" }, cumulative[0].month),
+					n > 1 ? react.createElement("text", { x: xs[n - 1], y: H - 6, textAnchor: "end", fontSize: 9, fill: "#8a94a3" }, cumulative[n - 1].month) : null);
+			}
+
+			// --- ④ milestone wall: unlocked cards + ghost cards -----------------
+			const wall = react.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+				milestones.map((ms) => {
+					const name = t(msNameKey(ms.key));
+					const cond = t(msCondKey(ms.key));
+					if (ms.achieved) {
+						return react.createElement("div", { key: ms.key, title: cond, style: { flex: "0 0 126px", padding: "8px 10px", border: "1px solid #dbe7fb", borderRadius: 10, background: "#f5f9ff", display: "flex", flexDirection: "column", gap: 3 } },
+							react.createElement("div", { style: { fontSize: 16 } }, ms.icon),
+							react.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#1c2024" } }, name),
+							ms.date ? react.createElement("div", { style: { fontSize: 10.5, color: "#1f6feb", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" } }, ms.date) : null);
+					}
+					return react.createElement("div", { key: ms.key, title: cond, style: { flex: "0 0 126px", padding: "8px 10px", border: "1px dashed #d4d9e0", borderRadius: 10, background: "#fafbfc", display: "flex", flexDirection: "column", gap: 3, color: "#9aa3b0" } },
+						react.createElement("div", { style: { fontSize: 16, filter: "grayscale(1)", opacity: 0.5 } }, ms.icon),
+						react.createElement("div", { style: { fontSize: 12, fontWeight: 600 } }, "🔒 " + name),
+						react.createElement("div", { style: { fontSize: 10.5, lineHeight: 1.4 } }, cond));
+				}));
 
 			// --- timeline: milestones (born, migrate, dna edits) -----------------
 			const tl = [];
@@ -708,30 +920,26 @@ window.__ModuleLoader__.load({
 			tl.sort((a, b) => a.date.localeCompare(b.date));
 
 			return react.createElement("div", { style: { flex: 1, minHeight: 0, padding: "14px 20px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 } },
-				// --- stat cards --------------------------------------------------
-				react.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-					card(t("growthBorn"), born, "#1f6feb"),
-					card(t("growthDays"), days !== null ? String(days) : "—"),
-					card(t("growthNotes"), String(data.notesCount || 0)),
-					card(t("growthBeliefs"), String(data.beliefsCount || 0)),
-					card(t("growthDnaChanges"), String(dna.length))),
+				// --- ① soul card ------------------------------------------------
+				soulCard,
+				// --- ② stat radar ------------------------------------------------
+				react.createElement("div", { style: { border: "1px solid #e4e8ee", borderRadius: 10, background: "#fff", padding: "10px 12px" } },
+					react.createElement("div", { style: { fontWeight: 600, color: "#1c2024", fontSize: 13 } }, t("statTitle")),
+					react.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "4px 0 0" } }, radar)),
+				// --- ③ growth curve ----------------------------------------------
+				...(curve
+					? [sectionTitle(t("curveTitle")),
+						react.createElement("div", { style: { border: "1px solid #e4e8ee", borderRadius: 10, background: "#fff", padding: "10px 12px" } },
+							curve,
+							react.createElement("div", { style: { fontSize: 10.5, color: "#8a94a3", marginTop: 2 } }, "※ " + t("curveNote")))]
+					: []),
+				// --- ④ milestone wall --------------------------------------------
+				sectionTitle(t("msTitle") + " · " + t("msDone", { n: milestones.filter((x) => x.achieved).length })),
+				wall,
 				// --- record span line --------------------------------------------
 				...(data.notesSpan
 					? [react.createElement("div", { style: { fontSize: 12, color: "#8a94a3" } },
 						"🗓 " + t("growthSpan", { first: data.notesSpan.first, last: data.notesSpan.last }))]
-					: []),
-				// --- monthly activity chart --------------------------------------
-				...(monthly.length > 0
-					? [sectionTitle(t("growthActivity")),
-						react.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 6, height: 130, padding: "12px 14px", border: "1px solid #e4e8ee", borderRadius: 10, background: "#fff", overflowX: "auto" } },
-							monthly.map((x) => {
-								const barH = Math.max(4, Math.round((x.count / maxCount) * 84));
-								const isCurrent = x.month >= (new Date().toISOString().slice(0, 7));
-								return react.createElement("div", { key: x.month, title: x.month + " · " + x.count + " 篇", style: { flex: "0 0 30px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 4, height: "100%" } },
-									react.createElement("span", { style: { fontSize: 10, color: "#1c2024", fontWeight: 600, fontVariantNumeric: "tabular-nums" } }, x.count),
-									react.createElement("div", { style: { width: 22, height: barH, borderRadius: "4px 4px 0 0", background: isCurrent ? "#1f6feb" : "#7ba7e8", boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)" } }),
-									react.createElement("span", { style: { fontSize: 9.5, color: "#8a94a3", whiteSpace: "nowrap" } }, x.month.slice(2)));
-							}))]
 					: []),
 				// --- timeline -----------------------------------------------------
 				sectionTitle(t("growthTimeline")),

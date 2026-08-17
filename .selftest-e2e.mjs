@@ -151,6 +151,23 @@ const agentsPath = join(fakeHome, ".dsh", "AGENTS.md");
   check(Array.isArray(r.body.beliefsRecent) && r.body.beliefsRecent.every((b) => typeof b.date === "string" && typeof b.text === "string"), "growth: beliefsRecent carry date+text");
   check(typeof r.body.born === "string", "growth: born is a date string");
   check(Array.isArray(r.body.monthly) && r.body.monthly.every((x) => typeof x.month === "string" && typeof x.count === "number"), "growth: monthly activity array present");
+  // --- raising-sim layer: level/XP/stats/milestones/streak -------------------
+  const g = r.body.growth;
+  check(g && typeof g.level.level === "number" && g.level.level >= 1 && g.level.level <= 30, "growth: level within 1..30");
+  check(g && typeof g.xp.total === "number" && g.xp.total >= 0, "growth: total XP is a non-negative number");
+  check(g && g.stats && ["together", "record", "reflect", "evolve", "focus", "belief"].every((k) => typeof g.stats[k] === "number"), "growth: six stat dimensions present");
+  check(g && Array.isArray(g.milestones) && g.milestones.length === 12, "growth: milestone wall has 12 entries");
+  check(g && Array.isArray(g.cumulative) && g.cumulative.every((c) => typeof c.month === "string" && typeof c.xp === "number"), "growth: cumulative curve present");
+  check(g && g.streak && typeof g.streak.max === "number" && typeof g.streak.current === "number", "growth: streak numbers present");
+  check(g && g.milestones.every((m) => m.achieved === (m.achieved === true)), "growth: milestones carry achieved flag");
+  // writing a daily note scores +10 note XP and unlocks first-note milestone
+  const memDir = join(fakeHome, ".dsh", "souls", "kagura", "memory");
+  mkdirSync(memDir, { recursive: true });
+  const noteDay = new Date().toISOString().slice(0, 10);
+  writeFileSync(join(memDir, noteDay + ".md"), "# note\n\nhello growth\n");
+  const r2 = await call("/api/dsh-soul/growth", { name: "kagura" });
+  check(r2.body.growth.xp.notes === r2.body.notesCount * 10, "growth: note XP scores +10 per note");
+  check(r2.body.growth.milestones.find((m) => m.key === "firstNote").achieved === true, "growth: first-note milestone unlocks with a note");
   check((await call("/api/dsh-soul/growth", { name: "nope" })).status === 400, "growth: unknown soul rejected");
 }
 

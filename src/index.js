@@ -239,6 +239,116 @@ function writeManifest(dir, patch) {
   return next;
 }
 
+// ---------------------------------------------------------------------------
+// growth scoring — real events score into a raising-sim growth system.
+// Rules are published in the UI and docs/growth-design.md. Nothing fabricated:
+// every metric derives from notes, beliefs, DNA edits (the manifest audit
+// trail stays the source of truth).
+// ---------------------------------------------------------------------------
+
+const XP_NOTE = 10; // daily note
+const XP_BELIEF = 20; // belief candidate
+const XP_DNA = 50; // DNA edit
+const XP_GRADUATED = 100; // belief graduation
+
+function xpNeed(level) {
+  if (level <= 5) return 100;
+  if (level <= 10) return 200;
+  if (level <= 15) return 400;
+  if (level <= 20) return 800;
+  if (level <= 25) return 1200;
+  return 1800;
+}
+
+/** Level for a total XP. Fast early, slow late (Pokémon-style), cap Lv 30. */
+function levelForXp(xp) {
+  let level = 1;
+  let rest = xp;
+  while (level < 30) {
+    const need = xpNeed(level);
+    if (rest < need) return { level, into: rest, need };
+    rest -= need;
+    level += 1;
+  }
+  return { level: 30, into: 0, need: 0, maxed: true };
+}
+
+function dateKey(ts) {
+  return (ts || "").slice(0, 10);
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + "T00:00:00Z");
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Sorted unique daily-note dates, longest streak, first 7-day streak date. */
+function noteDatesAndStreak(dir) {
+  const mp = join(dir, "memory");
+  const dates = [];
+  try {
+    if (existsSync(mp)) {
+      for (const n of readdirSync(mp)) {
+        const m = n.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (m) dates.push(m[1]);
+      }
+    }
+  } catch { /* ignore */ }
+  const unique = [...new Set(dates)].sort();
+  const MS = 86400000;
+  let max = 0;
+  let firstWeek = null;
+  let cur = 0;
+  let prevTs = null;
+  for (const d of unique) {
+    const ts = new Date(d + "T00:00:00Z").getTime();
+    cur = prevTs !== null && ts - prevTs === MS ? cur + 1 : 1;
+    if (cur > max) max = cur;
+    if (cur === 7 && firstWeek === null) firstWeek = d;
+    prevTs = ts;
+  }
+  return { dates: unique, max, firstWeek };
+}
+
+/** Current streak: consecutive days with notes ending today (or yesterday if
+ * today has no note yet). Never counts a day that has no note — so
+ * current <= max always holds. */
+function currentStreak(dates, today) {
+  if (dates.length === 0) return 0;
+  const last = dates[dates.length - 1];
+  let anchor;
+  if (last === today) anchor = today;
+  else if (last === addDays(today, -1)) anchor = addDays(today, -1);
+  else return 0;
+  let cur = 0;
+  for (let i = dates.length - 1; i >= 0; i--) {
+    if (dates[i] === addDays(anchor, -cur)) cur += 1;
+    else break;
+  }
+  return cur;
+}
+
+/** Count graduated beliefs and the first graduation date. */
+function graduatedBeliefs(dir) {
+  let count = 0;
+  let first = null;
+  try {
+    const bp = join(dir, "beliefs", "candidates.md");
+    if (existsSync(bp)) {
+      for (const l of readFileSync(bp, "utf8").split("\n")) {
+        const m = l.match(/\*\*graduated\s+(\d{4}-\d{2}-\d{2})/);
+        if (m) {
+          count += 1;
+          if (first === null || m[1] < first) first = m[1];
+        }
+      }
+    }
+  } catch { /* ignore */ }
+  return { count, first };
+}
+
 /** Render the active soul into ~/.dsh/AGENTS.md (with backup of foreign content). */
 function renderActive(root, soulName, dir) {
   const files = [];
@@ -524,6 +634,7 @@ function apply(ctx, config) {
 
     // --- beliefs: count real candidate bullets (`- YYYY-MM-DD: ...` / `- [YYYY-MM-DD]`)
     let beliefsCount = 0;
+    let beliefsFirst = null;
     let beliefsRecent = []; // { date, text }
     try {
       const bp = join(dir, "beliefs", "candidates.md");
@@ -537,6 +648,7 @@ function apply(ctx, config) {
           }
         }
         beliefsCount = entries.length;
+        if (entries.length > 0) beliefsFirst = entries.map((e) => e.date).sort()[0];
         beliefsRecent = entries.slice(-8).reverse();
       }
     } catch { /* ignore */ }
@@ -570,6 +682,60 @@ function apply(ctx, config) {
       }
     } catch { /* ignore */ }
 
+    // --- growth scoring: real events → raising-sim system (docs/growth-design.md)
+    const { dates, max, firstWeek } = noteDatesAndStreak(dir);
+    const { count: graduatedCount, first: firstGraduated } = graduatedBeliefs(dir);
+    const dnaChanges = manifest.dnaChanges || [];
+    const today = new Date().toISOString().slice(0, 10);
+    const xp = {
+      notes: notesCount * XP_NOTE,
+      beliefs: beliefsCount * XP_BELIEF,
+      dna: dnaChanges.length * XP_DNA,
+      graduated: graduatedCount * XP_GRADUATED,
+    };
+    xp.total = xp.notes + xp.beliefs + xp.dna + xp.graduated;
+    const level = levelForXp(xp.total);
+    const daysSinceBirth = born
+      ? Math.max(1, Math.floor((new Date(today + "T00:00:00Z").getTime() - new Date(born + "T00:00:00Z").getTime()) / 86400000) + 1)
+      : 1;
+    const stats = {
+      together: Math.min(100, Math.round((100 * dates.length) / daysSinceBirth)),
+      record: Math.min(100, Math.round(notesCount * 0.5)),
+      reflect: Math.min(100, Math.round(beliefsCount * 0.15)),
+      evolve: Math.min(100, Math.round(dnaChanges.length * 2)),
+      focus: Math.min(100, max),
+      belief: Math.min(100, Math.round(graduatedCount * 10)),
+    };
+    const metDate = manifest.migrations && manifest.migrations[0]
+      ? dateKey(manifest.migrations[0].ts)
+      : manifest.createdAt ? dateKey(manifest.createdAt) : null;
+    const milestones = [
+      { key: "born", icon: "🎂", achieved: true, date: born },
+      { key: "met", icon: "🤝", achieved: !!metDate, date: metDate },
+      { key: "firstNote", icon: "📖", achieved: notesCount >= 1, date: notesSpan ? notesSpan.first : null },
+      { key: "firstBelief", icon: "💡", achieved: beliefsCount >= 1, date: beliefsFirst },
+      { key: "firstEvolve", icon: "✏️", achieved: dnaChanges.length >= 1, date: dateKey(dnaChanges[0] && dnaChanges[0].ts) },
+      { key: "week", icon: "🔥", achieved: max >= 7, date: firstWeek },
+      { key: "month", icon: "🌿", achieved: daysSinceBirth >= 30, date: born ? addDays(born, 29) : null },
+      { key: "grad", icon: "🎓", achieved: graduatedCount >= 1, date: firstGraduated },
+      { key: "evolve3", icon: "🧠", achieved: dnaChanges.length >= 3, date: null },
+      { key: "notes100", icon: "📚", achieved: notesCount >= 100, date: null },
+      { key: "beliefs100", icon: "🏛️", achieved: beliefsCount >= 100, date: null },
+      { key: "anniv", icon: "🎂", achieved: daysSinceBirth >= 365, date: born ? addDays(born, 364) : null },
+    ];
+    const cumulative = [];
+    {
+      let acc = 0;
+      for (const m of monthly) {
+        acc += m.count * XP_NOTE;
+        cumulative.push({ month: m.month, xp: acc });
+      }
+    }
+    let avatar = null;
+    for (const ext of AVATAR_EXTS) {
+      if (existsSync(join(dir, "avatar" + ext))) { avatar = "avatar" + ext; break; }
+    }
+
     sendJson(res, 200, {
       ok: true,
       name: soulName,
@@ -581,6 +747,15 @@ function apply(ctx, config) {
       monthly,
       notes,
       beliefsRecent,
+      avatar,
+      growth: {
+        xp,
+        level,
+        stats,
+        streak: { max, current: currentStreak(dates, today) },
+        milestones,
+        cumulative,
+      },
     });
   }
 
